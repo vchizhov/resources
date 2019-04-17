@@ -1,3 +1,7 @@
+# THIS GUIDE IS INCOMPLETE, UNFINISHED AND A WORK IN PROGRESS. 
+
+It is not suitable for beginners and may be inaccurate.
+
 # How To Set Up OpenGL and GLFW on Windows for C++
 
 By Andre Popovitch
@@ -11,6 +15,3 @@ OpenGL is short for Open Graphics Library. This means it provides a set of tools
 # Prerequisites
 
 This guide assumes you're using Visual Studio. To get help installing Visual Studio, refer to TODO: ADD LINK.
-
-# How to setup a C++ Environment
-

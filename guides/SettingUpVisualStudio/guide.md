@@ -72,7 +72,7 @@ You've created a Visual Studio Project, but that lives inside a Visual Studio So
 
 ## Where To Go from Here
 
-Consider setting up OpenGL for Windows TODO ADD LINK, which will allow you to make programs that render images to the screen, instead of just text.
+Consider setting up OpenGL for Windows, which will allow you to make programs that render images to the screen, instead of just text. Tutorial for that coming soon :)
 
 ## Questions
 
