@@ -1,4 +1,4 @@
-# Premake5 and OpenGL
+# Premake5 and OpenGL 
 
 By Nick Clark
 
@@ -6,12 +6,21 @@ Last updated: 2019/04/16
 
 ## Prerequisites
 
-1. Premake5 is set up on your development machine.
-2. A build tool is installed on your development machine.
+1. Premake5 is [set up on your development machine](../../../Miscellaneous/Toolchains/Premake/Index.md).
+2. A C++ build tool is installed on your development machine such as [Visual Studio](../../../Miscellaneous/Toolchains/Visual_Studio/Index.md).
 
 ## Read Before
 
 To learn how to set up Premake 5, read this [guide](../../../Miscellaneous/Toolchains/Premake/Index.md)
+
+## What Is OpenGL?
+
+OpenGL is short for Open Graphics Library. This means it provides a set of tools which allow you to display 2D and 3D images to your screen, a process called *rendering*. It is useful because the rendering is typically "hardware accelerated", meaning that the GPU (Graphics Processing Unit) is automatically used to make rendering much faster that it would be otherwise. OpenGL is also useful because it works on a variety of platforms, unlike other graphics libraries such as Metal or Direct3D. OpenGL is considered to be a good starting point for someone new to graphics programming, as there are an immense number of resources available for learners.
+
+
+## What Is GLFW
+
+Different platforms have different ways of doing things such as creating windows, getting input from the mouse, etc. For simplicity, we use a library called GLFW which provides a single cross-platform interface for many different things you need to do. 
 
 ## Adding OpenGL to Premake5 Projects
 
