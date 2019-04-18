@@ -1,5 +1,9 @@
 # Premake5 and OpenGL
 
+By Nick Clark
+
+Last updated: 2019/04/16
+
 ## Prerequisites
 
 1. Premake5 is set up on your development machine.
