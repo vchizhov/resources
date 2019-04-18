@@ -46,13 +46,13 @@ From here this should open the System Properties window. Hit the "Environment Va
 
 In here, you want to find the entry "Path" under "System Variables". Hit it and then hit "Edit".
 
-![path](image/path.png)
+![path](images/path.png)
 
 This opens every entry on your `PATH`. You `PATH` is every directory where windows will look for a program when you type a command into the command prompt. Double click an empty space and add the directory that you put `premake5.exe` in.
 
-![editing path](image/editingPath.png)
+![editing path](images/editingPath.png)
 
 Then, close the window and press "OK" in the System Properties window. The directory has been added to the `PATH` and Premake is installed! To test it, open a new command prompt and type `premake5`. You should see something like this:
 
-![premake test](premakeTest.png)
+![premake test](images/premakeTest.png)
 
