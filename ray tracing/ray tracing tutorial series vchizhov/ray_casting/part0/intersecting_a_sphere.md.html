@@ -15,12 +15,8 @@ $\newcommand\norm[1]{\| #1 \|}$
 
 ## Prerequisites
 
-The reader is expected to have some fundamental programming skills as well as have some basic knowledge in linear algebra and analytic geometry. 
-The code throughout this tutorial will be in C++, and while we will intentionally avoid more complex programming notions, we still use convenient 
-tools like polymorphism to structure our implementation (while possibly affecting performance). Still, the focus is on simplicity and clarity rather 
-than performance. The mathematical knowledge required includes: the notion of 3-dimensional vectors, the dot product, the cross product, and solving 
-quadratic equations. While additional knowledge may help to appreciate some of the ideas better, it is not required, and proofs that go outside of this scope 
-may be skipped altogether (they are provided for completeness). Additional proofs/derivations can be found in the appendix at the end of every article.
+For this tutorial basic C++ and linear algebra knowledge is assumed. The mathematical knowledge required includes: the notion of 
+3-dimensional vectors, the dot product, the cross product, and solving quadratic equations. 
 
 
 ## Intersecting a sphere
@@ -54,8 +50,8 @@ $$\vec{u} \times \vec{v} \coloneqq (u_1v_2-u_2v_1, u_2v_0-u_0v_2, u_0v_1-u_1v_0)
 The length (magnitude) of a vector $\vec{v}$ will be denoted $\norm{\vec{v}}$, and is computed as:
 $$\norm{\vec{v}} = \sqrt{\inner{\vec{v}}{\vec{v}}}$$
 
-We recommend that readers that have never before written a vector class, take the time to implement the structure and operations defined above as an exercise, 
-readers that have done this previously should feel free to use the provided implementation directly (or use their own). The corresponding reference code can be 
+We recommend that readers that have never before written a vector class, take the time to implement the structure and operations defined above as an exercise. 
+Readers that have done this previously should feel free to use the provided implementation directly (or use their own). The corresponding reference code can be 
 found in *vec.hpp*.
 
 ### Image representation and saving as PPM
@@ -117,8 +113,8 @@ The output for a $640\times 480$ image is presented below:
 A reference implementation of a structure representing an image and a method to save a PPM file can be found in *image.hpp*. The readers are encouraged to 
 modify it or implement their own variant.
 
-### Camera and generating rays
-A ray in 3D is defined by its origin $\vec{o}$ and a direction vector $\vec{d}$. All points (the set of points) on the ray are given by 
+### Parametric definition of a ray
+A ray in 3D can be defined by its origin $\vec{o}$ and a direction vector $\vec{d}$. All points (the set of points) on the ray are given by 
 $\vec{r}(t) = \vec{o}+t\vec{d}, t\geq 0$. We will exclusively use normalized ray directions ($\norm{\vec{d}}=1$) since it saves a lot of trouble down 
 the line normalizing directions for shading calculations and this also makes some intersection calculations easier. Additionally if the direction vector is 
 normalized, then the point:
@@ -128,6 +124,15 @@ is exactly at a distance $t$ from $\vec{o}$, meaning that $\norm{\vec{r}(t)-\vec
 
 ![An illustration of a ray with points at different $t$ values on it](images/ray.png)
 
+Often in 2D lines are defined by $y=ax + b$ (slope-intercept form). A similar formulation is also possible in 3D, however it requires 
+representing the ray as the intersection of two non-parallel planes (a linear system of two equations). Additionally, when used to 
+compute intersections, this formulation would produce an intersection point, rather than a distance $t$ as in the case for the parametric 
+equation, this can prove inconvenient. Due to this we choose the parametric form of the definition of a ray for ray casting. In 
+higher dimensions the plane intersection form is even more inconvenient since we need in general the intersection of $N-1$ hyperplanes to 
+define a line.
+
+
+### Camera and generating rays
 We will also define a very simple camera, which given a pixel's coordinates $(x,y)$ will generate a ray passing through the center of said pixel. 
 There are numerous ways to define a camera, but here we define it by its origin $\vec{o}$, its right vector $\vec{e_0}$, its up vector $\vec{e_1}$, 
 and its forward vector $\vec{e_2}$. Initially those will be set to $(0,0,0)$, $(1,0,0)$, $(0,1,0)$, $(0,0,1)$ respectively, i.e. the 3 directions will coincide 
