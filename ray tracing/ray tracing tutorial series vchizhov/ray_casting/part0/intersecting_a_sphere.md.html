@@ -166,7 +166,7 @@ $$L_x(W) = a_xW + b_x = a_xW - r = r \implies a_x = 2\frac{r}{W}$$
 $$L_y(0) = a_y0+b_y = 1 \implies b_y = 1$$
 $$L_y(H) = a_yH+b_y = a_yH+1 = -1 \implies a_y = -\frac{2}{H}$$
 
-Then for an arbitrary pixel coordinate $(x,y)$ we can find its mapping to a point $(u,v) \in [-r,r]\times [-1,1]$:
+Then for an arbitrary pixel coordinate $(x,y) \in [0,W)\times[0,H)$ we can find its mapping to a point $(u,v) \in [-r,r]\times [-1,1]$:
 
 $$u = L_x(x) = \frac{2r}{W}x - r = r\left(\frac{2}{W}x-1\right)$$
 $$v = L_y(y) = -(\frac{2}{H}y - 1)$$
