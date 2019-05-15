@@ -294,7 +294,7 @@ int main()
 
 	float aspectRatio = (float)image.w() / (float)image.h();
 
-	// iterate over all image pixels in row-major order
+	// iterate over all image pixels, from left to right, and top to bottom
 	// for each image pixel shoot a ray and check for an intersection
 	// set white if there's an intersection, and black if there's none
 	for (int y = 0; y&ltimage.h(); ++y)
@@ -334,7 +334,8 @@ A shadertoy implementation can also be found here:
 
 # Appendix
 
-## Quadratic formula derivation
+## Quadratic polynomial roots formula derivation
+
 Having the equation:
 $$Ax^2 + Bx + C = 0, A\ne 0$$
 we want to find the solutions for $x$ (also called roots, which in this case are two, not necessarily distinct, and not necessarily real numbers).
