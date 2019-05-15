@@ -166,7 +166,7 @@ $$L_x(W) = a_xW + b_x = a_xW - r = r \implies a_x = 2\frac{r}{W}$$
 $$L_y(0) = a_y0+b_y = 1 \implies b_y = 1$$
 $$L_y(H) = a_yH+b_y = a_yH+1 = -1 \implies a_y = -\frac{2}{H}$$
 
-Then for an arbitrary pixel coordinate $(x,y) \in [0,W)\times[0,H)$ we can find its mapping to a point $(u,v) \in [-r,r]\times [-1,1]$:
+Then for an arbitrary pixel coordinate $(x,y) \in [0,W)\times[0,H)$ we can find its mapping to a point on the virtual film $(u,v) \in [-r,r]\times [-1,1]$:
 
 $$u = L_x(x) = \frac{2r}{W}x - r = r\left(\frac{2}{W}x-1\right)$$
 $$v = L_y(y) = -(\frac{2}{H}y - 1)$$
@@ -222,12 +222,15 @@ For a point $\vec{p}$ to be in the intersection of the ray and the sphere, it mu
 plugging in the sphere equation and solving for $t$:
 $$\inner{\vec{r}(t)-\vec{c}}{\vec{r}(t)-\vec{c}} = R^2$$
 $$\inner{\vec{o}+t\vec{d}-\vec{c}}{\vec{o}+t\vec{d}-\vec{c}} = R^2$$
-$$\inner{\vec{d}}{\vec{d}}t^2 -2\inner{\vec{d}}{\vec{c}-\vec{o}}t + \inner{\vec{c}-\vec{o}}{\vec{c}-\vec{o}} - R^2 = 0$$
+$$\inner{t\vec{d}-(\vec{c}-\vec{o})}{t\vec{d}-(\vec{c}-\vec{o})} = R^2$$
+$$\inner{t\vec{d}}{t\vec{d}}+\inner{t\vec{d}}{-(\vec{c}-\vec{o})} + \inner{-(\vec{c}-\vec{o})}{t\vec{d}} + \inner{-(\vec{c}-\vec{o})}{-(\vec{c}-\vec{o})} = R^2$$
+$$\inner{\vec{d}}{\vec{d}}t^2 - \inner{\vec{d}}{\vec{c}-\vec{o}}t - \inner{\vec{d}}{\vec{c}-\vec{o}}t + \inner{\vec{c}-\vec{o}}{\vec{c}-\vec{o}} - R^2 = 0$$
+$$\inner{\vec{d}}{\vec{d}}t^2 - 2\inner{\vec{d}}{\vec{c}-\vec{o}}t + \inner{\vec{c}-\vec{o}}{\vec{c}-\vec{o}} - R^2 = 0$$
 $$At^2 - 2Bt + C = 0$$
 $$A = \inner{\vec{d}}{\vec{d}}, B = \inner{\vec{d}}{\vec{c}-\vec{o}}, C=\inner{\vec{c}-\vec{o}}{\vec{c}-\vec{o}} - R^2$$
 $$B' = -2B, D' = 4B^2-4AC = 4(B^2-AC) = 4D$$
 
-In step 3 we have used the linearity of the dot product. The linearity of the inner product can be formalized as:
+In step 3,4 and 5 we have used the linearity of the dot product. The linearity of the inner product can be formalized as:
 $$\inner{\alpha\vec{u}+\beta\vec{v}}{\vec{w}} = \alpha\inner{\vec{u}}{\vec{w}} + \beta\inner{\vec{v}}{\vec{w}}$$
 The symmetric case also holds, since the inner product is commutative:
 $$\inner{\vec{u}}{\vec{v}} = \inner{\vec{v}}{\vec{u}}$$
