@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ray Casting Tutorial (beginners) | Graphics Programming Resources</title>
+</head>
+<body>
+
+$\newcommand{\coloneqq}{\mathrel{\mathop:}=}$
+$\newcommand\inner[2]{\langle #1, #2 \rangle}$
+$\newcommand\norm[1]{\| #1 \|}$
+
+[Home](../../index.md.html)
+
+# Ray Casting
+
+## Prerequisites
+
+The reader is expected to have some fundamental programming skills as well as have some basic knowledge in linear algebra and analytic geometry. 
+The code throughout this tutorial will be in C++, and while we will intentionally avoid more complex programming notions, we still use convenient 
+tools like polymorphism to structure our implementation (while possibly affecting performance). Still, the focus is on simplicity and clarity rather 
+than performance. The mathematical knowledge required includes: the notion of 3-dimensional vectors, the dot product, the cross product, and solving 
+quadratic equations. While additional knowledge may help to appreciate some of the ideas better, it is not required, and proofs that go outside of this scope 
+may be skipped altogether (they are provided for completeness). Additional proofs/derivations can be found in the appendix at the end of every article.
+
+
+## Intersecting a sphere
+
+In this section we aim to set the fundamentals on which the later parts will build on. It is crucial that the reader understands most if not all of the things 
+discussed in this subsection. The end result of what seems like a lot of work will be a rather unimpressive flat (binary) rendering of a sphere. However, all 
+that effort will pay off in the later parts, when we have the technicalities out of the way and can focus on more interesting aspects such as shading. 
+Readers familiar with the basics should feel free to skim through or skip this part.
+
+### A simple 3D vector library
+Throughout the rest of the tutorial performing operations with 3D vectors will be commonplace. And while it is possible to type those out for each coordinate 
+every time they arise, it is neither practical nor efficient, so we make a slight detour to build a very simple (glsl inspired) 3D vector library. The structure 
+representing our 3-dimensional vector, that we denote *vec3*, will be made of 3 floating point numbers: $x,y,z$, and various aliases of those (see the code for 
+more details). If we have a vector $\vec{v}$ we will use the notation $v_0,v_1,v_2$ for its first, second, and third component respectively, alternatively 
+$v(0),v(1),v(2)$, or $\vec{v}=(v_0,v_1,v_2)$. We define the coordinatewise operations of addition $+$, subtraction $-$, multiplication $\cdot$, and 
+division $/$ on pairs of vectors $\vec{u},\vec{v}$ respectively as:
+$$\vec{u} + \vec{v} \coloneqq (u_0 + v_0, u_1 + v_1, u_2 + v_2)$$
+$$\vec{u} - \vec{v} \coloneqq (u_0 - v_0, u_1 - v_1, u_2 - v_2)$$
+$$\vec{u} \cdot \vec{v} \coloneqq (u_0v_0, u_1v_1, u_2v_2)$$
+$$\frac{\vec{u}}{\vec{v}} \coloneqq (\frac{u_0}{v_0}, \frac{u_1}{v_1}, \frac{u_2}{v_2})$$
+
+We additionally define multiplication and division with a scalar:
+$$\vec{u} \cdot s \coloneqq (u_0s, u_1s, u_2s)$$
+$$\frac{\vec{u}}{s} \coloneqq (\frac{u_0}{s}, \frac{u_1}{s},\frac{u_2}{s})$$
+
+Finally we define the dot and cross product as:
+$$\inner{\vec{u}}{\vec{v}} \coloneqq u_0v_0 + u_1v_1 + u_2v_2$$
+$$\vec{u} \times \vec{v} \coloneqq (u_1v_2-u_2v_1, u_2v_0-u_0v_2, u_0v_1-u_1v_0)$$
+
+The length (magnitude) of a vector $\vec{v}$ will be denoted $\norm{\vec{v}}$, and is computed as:
+$$\norm{\vec{v}} = \sqrt{\inner{\vec{v}}{\vec{v}}}$$
+
+We recommend that readers that have never before written a vector class, take the time to implement the structure and operations defined above as an exercise, 
+readers that have done this previously should feel free to use the provided implementation directly (or use their own). The corresponding reference code can be 
+found in *vec.hpp*.
+
+### Image representation and saving as PPM
+
+One can represent rendered images as either *vec3* valued 2D arrays (the first, second, and third coordinate correspond respectively to red, green, blue) with 
+dimensions $W\times H$ ($W$ being the width of the image, and $H$ being the height of the image), or one-dimensional arrays in row- or column-major order of size 
+$W\cdot H$ (we go with the second variant). We only require a structure that exposes an accessor, which given indices $(x,y)$ in the range $[0,W-1] \times [0,H-1]$ 
+returns the cell at $(x,y)$. Throughout this tutorial we will use the notation $A_{x,y}$ or $A(x,y)$ for accessing the $(x,y)$ element of an image named $A$. 
+In order to save such an image in plain PPM format, we write out the plain PPM header, which is made up of a magic number describing the file type *P3*, the 
+width as an integer value, the height as an integer value, and the maximum color value, which can be at most $2^{16}-1 = 65535$, with whitespaces between all 
+of those. An example of such a header for an image of dimensions $1024\times 768$, with a maximum color 
+value of $2^8-1 = 255$ looks like this:
+
+```
+P3
+1024 768
+255
+```
+
+After we have written out the header, we can proceed to write out our image. Note that we pick the convention of $(1,1,1)$ being white and $(0,0,0)$ being black, 
+which means that our image has floating point range $[0,1]^3$, since we want to save it as an image with an integer range $[0,255]^3$ we multiply the clamped pixel 
+values by $256$ and cast to integer (which is equivalent to rounding down in this case):
+
+```cpp
+for(int y=0;y&ltheight; ++y)
+{
+	for(int x=0;x&ltwidth;++x)
+	{
+		vec3 clampedColor = clamp(image(x,y) * 256.0, 0.0, 255.0);
+        
+		file &lt&lt (int)clampedColor(0) &lt&lt "\t" 
+		&lt&lt (int)clampedColor(1) &lt&lt "\t" 
+		&lt&lt (int)clampedColor(2) &lt&lt "\t\t";
+	}
+	file &lt&lt "\n";
+}
+file.close();
+```
+
+The clamp function is analogous to its glsl counterpart and limits the value to the given range (and is implemented coordinatewise for a vector, see the code for 
+more details). 
+The clamping is done in order to keep values in the range $[0,255]$.
+
+Finally, we provide an algorithm to render a horizontal gradient:
+```cpp
+for(int y=0;y&ltheight;++y)
+{
+    for(int x=0;x&ltwidth;++x)
+    {
+        image(x,y) = vec3((float)x/(float)(width-1));
+    }
+}
+```
+
+The output for a $640\times 480$ image is presented below:
+
+![Horizontal gradient](images/gradient_640_480.png)
+
+A reference implementation of a structure representing an image and a method to save a PPM file can be found in *image.hpp*. The readers are encouraged to 
+modify it or implement their own variant.
+
+### Camera and generating rays
+A ray in 3D is defined by its origin $\vec{o}$ and a direction vector $\vec{d}$. All points (the set of points) on the ray are given by 
+$\vec{r}(t) = \vec{o}+t\vec{d}, t\geq 0$. We will exclusively use normalized ray directions ($\norm{\vec{d}}=1$) since it saves a lot of trouble down 
+the line normalizing directions for shading calculations and this also makes some intersection calculations easier. Additionally if the direction vector is 
+normalized, then the point:
+$$\vec{r}(t) = \vec{o} + t\vec{d}$$
+is exactly at a distance $t$ from $\vec{o}$, meaning that $\norm{\vec{r}(t)-\vec{o}} = t$, which will prove useful later on when we get to shading.
+
+
+![An illustration of a ray with points at different $t$ values on it](images/ray.png)
+
+We will also define a very simple camera, which given a pixel's coordinates $(x,y)$ will generate a ray passing through the center of said pixel. 
+There are numerous ways to define a camera, but here we define it by its origin $\vec{o}$, its right vector $\vec{e_0}$, its up vector $\vec{e_1}$, 
+and its forward vector $\vec{e_2}$. Initially those will be set to $(0,0,0)$, $(1,0,0)$, $(0,1,0)$, $(0,0,1)$ respectively, i.e. the 3 directions will coincide 
+with the $X,Y,Z$ axes, and the camera's origin will be at the origin of the coordinate system. The way we defined the 3 vectors makes them orthonormal:
+orthogonal/perpendicular to each other and unit length. Mathematically orthogonality of two vectors $\vec{u},\vec{v}$ is defined as $\inner{\vec{u}}{\vec{v}}=0$, 
+and a vector being unit length means that its magnitude is $1$, or using the norm definition from the 3D vector library subsection: $\norm{\vec{u}} = 1$, which can 
+be written equivalently as $\inner{\vec{u}}{\vec{u}} = 1$, since $1 = \sqrt{1} = \sqrt{\inner{\vec{u}}{\vec{u}}} = \norm{\vec{u}}$. 
+One may compute the inner products for $\vec{e}_0, \vec{e}_1, \vec{e}_2$ and verify that:
+$$\inner{\vec{e}_0}{\vec{e}_1} = 0, \inner{\vec{e}_0}{\vec{e}_2} = 0, \inner{\vec{e}_1}{\vec{e}_2} = 0$$
+$$\inner{\vec{e}_0}{\vec{e}_0} = 1, \inner{\vec{e}_1}{\vec{e}_1} = 1, \inner{\vec{e}_2}{\vec{e}_2} = 1$$
+Which proves that the 3 vectors are orthonormal (in fact they form an orthonormal basis for the vector space $\mathbb{R}^3$ since orthogonality implies linear 
+independence and the dimension of the space is equal to the number of vectors).
+
+When we generate a ray, its origin will coincide with the origin of the camera. Given pixel coordinates 
+$(x,y) \in [0,W)\times [0,H)$ we first map those to $[-r,r]\times [1,-1]$ in order for the center of the image to be at $(0,0)$ (which provides symmetry 
+with respect to the center of our screen), where $r = \frac{W}{H}$ is the aspect ratio. We usually want the virtual camera film to have the same 
+aspect ratio as our target resolution as to not stretch out the image, that's why we have $[-r,r]\times [1,-1]$ rather than $[-1,1]\times [1,-1]$. 
+The flip of the $Y$ coordinate (that is using $[1,-1]$ rather than $[-1,1]$) is done to account for the fact that in screen coordinates the $Y$ coordinate 
+increases downwards and not upwards, which is the opposite of the convention for our virtual world where $(0,1,0)$ points up.
+
+Novice readers that are not very comfortable with mathematics should feel free to skip the derivation below and just use the results from it readily, 
+even though it boils down to simply solving a linear system of equations. 
+
+We derive the linear mapping from $[0,W)\times[0,H)$ to $[-r,r]\times [-1,1]$. This is done by finding linear functions: 
+$L_x(x) = a_xx+b_x, L_y(y) = a_yy+b_y$, such that $L_x(0) = -r$, $L_x(W) = r$, $L_x(0) = 1$, $L_x(H) = -1$. 
+
+$$L_x(0) = a_x0 + b_x = -r \implies b_x = -r$$
+$$L_x(W) = a_xW + b_x = a_xW - r = r \implies a_x = 2\frac{r}{W}$$
+$$L_x(x) = \frac{2r}{W}x - r = r\left(\frac{2}{W}x-1\right)$$
+$$L_y(0) = a_y0+b_y = 1 \implies b_y = 1$$
+$$L_y(H) = a_yH+b_y = a_yH+1 = -1 \implies a_y = -\frac{2}{H}$$
+$$L_y(y) = -(\frac{2}{H}y - 1)$$
+
+There's a final minor detail to account for, which is that $(x,y)$ really constitutes a pixel's upper left corner, so an offset by $(0.5,0.5)$ is 
+necessary for the ray to pass through the center of the pixel and not the lower left corner of a pixel of the virtual film (lower and not upper due 
+to the $y$ flip in virtual 3D space). Thus the final mapping from pixel coordinates to normalized screen coordinates is:
+$$L_x(x) = r\left(\frac{2}{W}(x+0.5)-1\right)$$
+$$L_y(y) = -\frac{2}{H}(y+0.5) + 1$$
+
+Finally, to generate the ray direction passing through a given pixel we use the normalized screen coordinates to pick a point on the virtual film of the camera:
+
+$$\vec{d} = L_x(x)\vec{e}_0 + L_y(y)\vec{e}_1 + e_2$$
+
+We normalize the direction after that for the reasons outlined in the beginning of the subsection. A reference implementation for generating a ray from 
+pixel coordinates can be found below, as well as in *camera.hpp* in the accompanying code:
+
+```cpp
+float u = (float)width/(float)height * 
+(2.0f * ((float)x + 0.5f) / (float)width - 1.0f);
+float v = -2.0f * ((float)y + 0.5f) / (float)height + 1.0f;
+vec3 rayOrigin = camera.origin;
+vec3 rayDirection = normalize(u * camera.e0 + v * camera.e1 + camera.e2);
+```
+
+### Sphere intersection
+
+At the core of ray casting lies finding the closest intersection between a ray and the geometrical representation of a scene. In this section we derive how that 
+can be done for a single sphere.
+
+A sphere is defined mathematically as the set of points that are equidistant (the distance being $R$ the radius) 
+from a certain point ($\vec{c}=(c_x,c_y,c_z)$ the center of the sphere). We can formalize this using statement by using the norm, since from the above definition 
+we know that if a point $\vec{p}$ is at a distance $R$ from $\vec{c}$ then it lies on the sphere, formally:
+
+$$\norm{\vec{p}-\vec{o}} = R$$
+
+We can square both sides of the equation to get:
+
+$$\norm{\vec{p}-\vec{c}}^2 = \inner{\vec{p}-\vec{c}}{\vec{p}-\vec{c}} = R^2$$
+
+This can equivalently be written in scalar form as:
+
+$$(x-c_x)^2 + (y-c_y)^2 + (z-c_z)^2 = R^2$$
+
+We use the inner product vector form of the equation in order to be more concise. Readers that are more comfortable with scalar notation are encouraged 
+to follow the derivation by rewriting each step in scalar form. Nevertheless, vector and matrix notation is commonplace in computer graphics, so one should try to 
+get comfortable with those (for instance we will use vector-matrix notation extensively to derive intersections with other primitives or for linear 
+transformations in later parts of the tutorial series).
+
+In the previous section we saw that a ray is defined (parametrically) as:
+$$\vec{r}(t) = \vec{o} + t\vec{d}$$
+For a point $\vec{p}$ to be in the intersection of the ray and the sphere, it must satisfy both equations. We can achieve that by setting $\vec{p} = \vec{r}(t)$, 
+plugging in the sphere equation and solving for $t$:
+$$\inner{\vec{r}(t)-\vec{c}}{\vec{r}(t)-\vec{c}} = R^2$$
+$$\inner{\vec{o}+t\vec{d}-\vec{c}}{\vec{o}+t\vec{d}-\vec{c}} = R^2$$
+$$\inner{\vec{d}}{\vec{d}}t^2 -2\inner{\vec{d}}{\vec{c}-\vec{o}}t + \inner{\vec{c}-\vec{o}}{\vec{c}-\vec{o}} - R^2 = 0$$
+$$At^2 - 2Bt + C = 0$$
+$$A = \inner{\vec{d}}{\vec{d}}, B = \inner{\vec{d}}{\vec{c}-\vec{o}}, C=\inner{\vec{c}-\vec{o}}{\vec{c}-\vec{o}} - R^2$$
+$$B' = -2B, D' = 4B^2-4AC = 4(B^2-AC) = 4D$$
+
+In step 3 we have used the linearity of the dot product. The linearity of the inner product can be formalized as:
+$$\inner{\alpha\vec{u}+\beta\vec{v}}{\vec{w}} = \alpha\inner{\vec{u}}{\vec{w}} + \beta\inner{\vec{v}}{\vec{w}}$$
+The symmetric case also holds, since the inner product is commutative:
+$$\inner{\vec{u}}{\vec{v}} = \inner{\vec{v}}{\vec{u}}$$
+As one may notice, by using the properties of the inner product we have made the derivation a lot more concise, this becomes especially apparent if one works 
+with even higher-dimensional vectors.
+
+As a result of the derivation we have a quadratic polynomial with respect to $t$ on the left side. 
+The solution for $t$ is well known (see the appendix), and is real only when the discriminant $D$ satisfies: 
+$D\geq 0$. If $D=0$, there is a single solution for $t$ corresponding to the ray grazing the sphere in a single point, if $D>0$, there are 2 solutions for $t$ 
+corresponding to the points where the ray enters the sphere and where it exits the sphere, if $D&lt0$ the ray does not intersect the sphere. The solutions are given 
+as:
+$$t_1 = \frac{-B'-\sqrt{D'}}{2A}, t_2 = \frac{-B'+\sqrt{D'}}{2A}$$
+$$t_1 = \frac{2B-\sqrt{4D}}{2A}, t_2 = \frac{2B+\sqrt{4D}}{2A}$$
+$$t_1 = \frac{B-\sqrt{D}}{A}, t_2 = \frac{B+\sqrt{D}}{A}$$
+$$t_1 = B-\sqrt{D}, t_2 = B+\sqrt{D}$$
+
+We have used that $A=\inner{d}{d} = 1$ in the last step (since the ray direction is assumed to be normalized).
+
+![Illustration of the 3 cases](images/sphere_intersection_2.png)
+
+The last detail that we are missing, is the fact that $\vec{r}(t)$ is part of the ray only for $t\geq 0$. Thus we should throw away intersections that do not 
+satisfy this criteria, as they will be effectively "behind" the ray's origin. 
+
+
+When tracing the ray through the scene we want to return the closest intersection, as obviously anything at a greater distance from the ray origin will be 
+occluded (unless the material at the  closest intersection is transparent, but we will leave that for the second part of the tutorial). 
+If we have only a single sphere and we have an intersection, we get two values $t_1, t_2$ (which will be equal in the case $D=0$). They correspond to two 
+possible intersections, the closer one being at a smaller distance from the ray's origin. Since our ray direction is normalized, $t_1, t_2$ are really the 
+distances of the two intersections from the ray origin. And we know that $t_1\leq t_2$ since we are subtracting a non-negative value ($\sqrt{D}$) from $B$ 
+for $t_1$ and adding the same non-negative value to $B$ for $t_2$.
+If the closer intersection is not smaller than $0$ then it is at a positive distance from the ray origin, and thus in front of it so we should return it as the 
+closer intersection. If $t_1&lt0$, but $t_2 \geq 0$ then the first intersection is at a negative distance from the ray origin (it is behind it), however 
+$t_2 \geq$, so we should return $t_2$ as the closer intersection. This is the case when the ray origin is inside the sphere.
+Finally if $t_1&lt0, t_2&lt0$ then the ray origin is outside of the sphere, and the sphere is behind it, so we should return no intersection.
+For convenience we will allow a user-defined range $(t_{\min}, t_{\max})$ for which we will accept intersections, this is equivalent to intersecting the 
+sphere surface with a line segment rather than a ray, this allows defining near and far distances similar to the near and far planes in rasterized graphics.
+The only difference in that case is that we perform a check $t_{\min} < t_1 < t_{\max}$ rather than just $t_1\geq 0$, and we do the same for $t_2$.
+
+The reference implementation can be found in *sphere.h* in the accompanying code. Note that we treat the grazing case as having no intersection there, 
+since it's irrelevant and in most cases caused by numerical error (due to the finite precision of computers). In our implementation we return $t=+\infty$ if 
+there is no intersection - we consider the distance to the intersection to be infinite, so we can filter out no intersection cases by simply checking whether 
+$t < +\infty$.
+
+
+### Putting it all together
+
+Now we can visualize our sphere by coloring pixels for which there is an intersection in white, and pixels for which there is no intersection in black.
+All we need to do is iterate over all our pixels, generate rays through their centers, check for an intersection with our sphere, and if there's an 
+intersection write a white color in the respective pixel of our image, otherwise write a black color.
+
+
+```cpp
+int main()
+{
+	Image image;
+	image.init(640,480);
+
+	Camera camera;
+
+	Sphere sphere(vec3(0, 0, 2), 1);
+
+	float aspectRatio = (float)image.w() / (float)image.h();
+
+	// iterate over all image pixels in row-major order
+	// for each image pixel shoot a ray and check for an intersection
+	// set white if there's an intersection, and black if there's none
+	for (int y = 0; y&ltimage.h(); ++y)
+	{
+		for (int x = 0; x&ltimage.w(); ++x)
+		{
+			// map [0,width]x[0,height] to 
+			// [-aspectRatio,aspectRatio] x [1,-1]
+			// multiply by the aspect ratio to stretch/squeeze the
+			// virtual film size to match the screen's aspect ratio
+			float u = aspectRatio * 
+			(2.0f * ((float)x + 0.5f) / (float)image.w() - 1.0f);
+			float v = -2.0f * 
+			((float)y + 0.5f) / (float)image.h() + 1.0f;
+
+			Ray ray = camera(u, v);
+
+			image(x, y) = vec3(float(sphere.intersect(ray)&ltINFINITY));
+		}
+	}
+	image.savePPM("out.ppm");
+	return 0;
+}
+```
+
+![Binary rendering of a sphere](images/sphere_640_480.png)
+
+This can trivially be extended to return a color based on the intersection distance by using the fact that our ray directions are normalized. We can for example 
+return a color based on the reciprocal squared distance to the intersection, which is nothing else than $\frac{1}{t^2}$.
+
+![Reciprocal squared distance rendering of a sphere](images/sphere_inverse_distance_640_480.png)
+
+A shadertoy implementation can also be found here::<br><br>
+<center><iframe width="640" height="360" frameborder="0" src="https://www.shadertoy.com/embed/ttlGWX?gui=true&t=10&paused=true&muted=true" allowfullscreen></iframe></center>
+
+
+
+# Appendix
+
+## Quadratic formula derivation
+Having the equation:
+$$Ax^2 + Bx + C = 0, A\ne 0$$
+we want to find the solutions for $x$ (also called roots, which in this case are two, not necessarily distinct, and not necessarily real numbers).
+$$Ax^2 + Bx + C = 0$$
+$$x^2 + \frac{B}{A}x = -\frac{C}{A}$$
+$$x^2 + \frac{B}{A}x + \left(\frac{B}{2A}\right)^2 = -\frac{C}{A} +  \left(\frac{B}{2A}\right)^2$$
+$$\left(x+\frac{B}{2A}\right)^2 = \frac{B^2 - 4AC}{4A}$$
+$$x_{2,1} = \frac{-B \pm \sqrt{B^2-4AC}}{2A}$$
+
+In the third step we have simply added $\left(\frac{B}{2A}\right)^2$ to both sides. In the fourth step we have expanded the square on the left-hand 
+side, and found a common denominator for both terms. In the fifth step we have taken the square root of both sides, note that $\pm$ and the two 
+solutions come from the fact that we consider not only the principal square root (for example $\sqrt{9} = 3$ is the principal square root, 
+but $\sqrt{9} = -3$ is also a square root).
+The term $D = B^2-4AC$ is called the discriminant. When it is equal to $0$ the two roots coincide, when it's greater than $0$ the two 
+roots are real numbers, when it is less than $0$ both roots are complex numbers.
+
+Note that a simplified solution is available for equations of the form:
+$$Ax^2 - 2Bx + C=0$$
+$$D' = (2B)^2 - 4AC = 4(B^2-AC) = 4D$$
+$$x_{2,1} = \frac{2B \pm \sqrt{4D}}{2A} = \frac{B \pm \sqrt{D}}{A}$$
+
+If additionally $A=1$, as is the case for the sphere intersection when the ray direction is a unit vector we get the very simple expression:
+$$x_{2,1} = B \pm \sqrt{B^2-C}$$
+
+
+<!-- Markdeep: -->
+<style class="fallback">body{visibility:hidden;white-space:pre;font-family:monospace}</style>
+<script src="../../../../scripts/markdeep.js"></script>
+<script>window.alreadyProcessedMarkdeep||(document.body.style.visibility="visible")</script>
+<link rel="stylesheet" href="../../../../css/github-markdown.css"/>
+
+</body>
+</html>

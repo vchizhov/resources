@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Ray Tracing tutorial series (beginners) | Graphics Programming Resources</title>
+</head>
+<body>
+
+# Ray Tracing tutorial series
+
+## Introduction
+
+This series of tutorials is meant to walk the reader iteratively through programming a basic ray caster, ray marcher, ray tracer, and path tracer at a beginner level. 
+The emphasis will be on simplicity, clarity, and completeness (as far as the beginner level constraint allows), rather than on performance and innovation. 
+The goal is to incrementally extend the knowledge of the reader, mainly following the historical development of the field (sphere tracing and ray marching 
+being an exception). This means that we will start all the way back with Appel's work on ray casting [#Appel68], take a detour to Hart's paper 
+on sphere tracing [#Hart96], proceed through with Whitted's work on ray tracing [#Whitted79], continue with Cook et al.'s 
+distributed ray tracing [#Cook84], and finally end our journey with Kajiya's seminal work on the rendering equation and path tracing [#Kajiya86]. 
+Other articles and papers would be referenced also, but the ones listed form the foundations for this tutorial series. The order is 
+chosen to be conceptually consistent and to follow the increase in complexity of the ideas in the field.
+The tutorial comes paired with a C++ implementation of the discussed ideas and techniques. The reader should ideally refer to the code for 
+anything missing in the tutorial and vice versa.
+
+## Prerequisites
+
+The reader is expected to have intermediate knowledge in C++ and foundational knowledge from linear algebra. In general the complexity 
+increases with each subsequent part of the tutorial, however most mathematical notions and ideas are distributed throughout the 
+different parts of the tutorial.
+
+## Acknowledgements
+
+I thank Connor Fitzgerald for reviewing the code and making meaningful suggestions how to improve it. 
+I also thank Michał Witanowski for reviewing the text and offering advice on its structure.
+
+## Index
+
+### Ray Casting
+
+#### [Intersecting a sphere](ray_casting/part0/intersecting_a_sphere.html)
+
+
+
+**Bibliography**:
+[#Appel68]: 
+Arthur Appel. 1968. 
+Some techniques for shading machine renderings of solids. 
+In *Proceedings of the April 30--May 2, 1968, spring joint computer conference (AFIPS '68 (Spring)). ACM, New York, NY, USA, 37-45.* 
+http://dx.doi.org/10.1145/1468075.1468082 
+
+[#Hart96]:  
+John C. Hart 1996.  
+Sphere tracing: a geometric method for the antialiased ray tracing  of  implicit  surfaces.
+*The  Visual  Computer,  12(10):527–545,  Dec 1996.*
+https://doi.org/10.1007/s003710050084
+
+[#Whitted79]: 
+Turner Whitted. 1979. An improved illumination model for shaded display. 
+In *Proceedings of the 6th annual conference on Computer graphics and interactive techniques (SIGGRAPH '79). ACM, New York, NY, USA, 14-.* 
+http://dx.doi.org/10.1145/800249.807419 
+
+[#Cook84]: 
+Robert L. Cook, Thomas Porter, and Loren Carpenter. 1998. 
+Distributed ray tracing. 
+In *Seminal graphics. ACM, New York, NY, USA 77-85.* 
+http://dx.doi.org/10.1145/280811.280978 
+
+[#Kajiya86]: 
+James T. Kajiya. 1986. 
+The rendering equation. 
+In *Proceedings of the 13th annual conference on Computer graphics and interactive techniques (SIGGRAPH '86), 
+David C. Evans and Russell J. Athay (Eds.). ACM, New York, NY, USA, 143-150.*
+http://dx.doi.org/10.1145/15922.15902 
+
+<!-- Markdeep: -->
+<style class="fallback">body{visibility:hidden;white-space:pre;font-family:monospace}</style>
+<script src="../../scripts/markdeep.js"></script>
+<script>window.alreadyProcessedMarkdeep||(document.body.style.visibility="visible")</script>
+<link rel="stylesheet" href="../../css/github-markdown.css"/>
+
+</body>
+</html>
