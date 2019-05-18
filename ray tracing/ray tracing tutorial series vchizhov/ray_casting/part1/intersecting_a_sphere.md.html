@@ -32,7 +32,7 @@ Throughout the rest of the tutorial performing operations with 3D vectors will b
 every time they arise, it is neither practical nor efficient, so we make a slight detour to build a very simple (glsl inspired) 3D vector library. The structure 
 representing our 3-dimensional vector, that we denote *vec3*, will be made of 3 floating point numbers: $x,y,z$, and various aliases of those (see the code for 
 more details). If we have a vector $\vec{v}$ we will use the notation $v_0,v_1,v_2$ for its first, second, and third component respectively, alternatively 
-$v(0),v(1),v(2)$, or $\vec{v}=(v_0,v_1,v_2)$. We define the coordinatewise operations of addition $+$, subtraction $-$, multiplication $\cdot$, and 
+$\vec{v}=(v_0,v_1,v_2)$. We define the coordinatewise operations of addition $+$, subtraction $-$, multiplication $\cdot$, and 
 division $/$ on pairs of vectors $\vec{u},\vec{v}$ respectively as:
 $$\vec{u} + \vec{v} \coloneqq (u_0 + v_0, u_1 + v_1, u_2 + v_2)$$
 $$\vec{u} - \vec{v} \coloneqq (u_0 - v_0, u_1 - v_1, u_2 - v_2)$$
@@ -231,9 +231,13 @@ $$A = \inner{\vec{d}}{\vec{d}}, B = \inner{\vec{d}}{\vec{c}-\vec{o}}, C=\inner{\
 $$B' = -2B, D' = 4B^2-4AC = 4(B^2-AC) = 4D$$
 
 In step 3,4 and 5 we have used the linearity of the dot product. The linearity of the inner product can be formalized as:
+
 $$\inner{\alpha\vec{u}+\beta\vec{v}}{\vec{w}} = \alpha\inner{\vec{u}}{\vec{w}} + \beta\inner{\vec{v}}{\vec{w}}$$
+
 The symmetric case also holds, since the inner product is commutative:
+
 $$\inner{\vec{u}}{\vec{v}} = \inner{\vec{v}}{\vec{u}}$$
+
 As one may notice, by using the properties of the inner product we have made the derivation a lot more concise, this becomes especially apparent if one works 
 with even higher-dimensional vectors.
 
