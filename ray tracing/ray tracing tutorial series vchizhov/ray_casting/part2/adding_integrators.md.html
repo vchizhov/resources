@@ -81,6 +81,9 @@ $$\sum_{i=a}^{b}{f_i}$$
 Integral $\int$ - the mathematical symbol used to denote integration (infinite sum of infinitely small elements):
 $$\int_{\Omega}{f(\vec{x})\,d\mu(\vec{x})}$$
 
+The code for this part of the tutorial can be found at:
+[C++ code](code/), [Shadertoy code](https://www.shadertoy.com/view/Wtf3Wl)
+
 
 ### Intersecting a collection of primitives
 
@@ -375,8 +378,8 @@ vec3 radiance(const Scene& scene, const Ray& ray) const final
 
 Note that we take the maximum of $0$ and the cosine, since we assume that surfaces are opaque, so no light can arrive from below the surface.
 Sampling the radiance from a point light is done through:
-```cpp
 
+```cpp
 LightSample sampleRadiance(const vec3& pos) const
 {
 	LightSample lightSample;
@@ -392,7 +395,6 @@ LightSample sampleRadiance(const vec3& pos) const
 	
 	return lightSample;
 }
-
 ```
 
 After rendering the image experienced readers may notice that the supposedly inverse-square falloff doesn't look quite right. 
@@ -460,6 +462,10 @@ the light emission to a disk region. We additionally use a procedural texture as
 projectors.
 
 ![The scene rendered with a textured cylinder light](images/spheres_diffuse_cylinder_light_640_480.png)
+
+
+center><iframe width="640" height="360" frameborder="0" src="https://www.shadertoy.com/embed/Wtf3Wl?gui=true&t=10&paused=true&muted=true" allowfullscreen></iframe></center>
+
 
 # Appendix
 
