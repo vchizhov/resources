@@ -12,31 +12,32 @@
 This series of tutorials is meant to walk the reader iteratively through programming a basic ray caster, ray marcher, ray tracer, and path tracer at a beginner level. 
 The emphasis will be on simplicity, clarity, and completeness (as far as the beginner level constraint allows), rather than on performance and innovation. 
 The goal is to incrementally extend the knowledge of the reader, mainly following the historical development of the field (sphere tracing and ray marching 
-being an exception). This means that we will start all the way back with Appel's work on ray casting [#Appel68], take a detour to Hart's paper 
+being an exception). This means that we will start all the way back with Appel's work on ray casting [#Appel68], take a detour with Hart's paper 
 on sphere tracing [#Hart96], proceed through with Whitted's work on ray tracing [#Whitted79], continue with Cook et al.'s 
 distributed ray tracing [#Cook84], and finally end our journey with Kajiya's seminal work on the rendering equation and path tracing [#Kajiya86]. 
-Other articles and papers would be referenced also, but the ones listed form the foundations for this tutorial series. The order is 
+Other articles and papers would also be referenced, but the ones listed form the foundations for this tutorial series. The order is 
 chosen to be conceptually consistent and to follow the increase in complexity of the ideas in the field.
-The tutorial comes paired with a C++ implementation of the discussed ideas and techniques. The reader should ideally refer to the code for 
-anything missing in the tutorial and vice versa.
+The tutorial comes paired with a C++ and a shadertoy (GLSL) implementation of the discussed ideas and techniques. The reader should ideally refer to the code for 
+anything missing from the tutorial and vice versa.
 
 ## Prerequisites
 
 
-The reader is expected to have intermediate knowledge in C++ and foundational knowledge from linear algebra and analytic geometry. While 
-additional knowledge may help the reader to appreciate some of the ideas better, it is not required, and proofs that go outside of this scope 
+The reader is expected to have intermediate knowledge of C++ (and/or GLSL) and foundational knowledge from linear algebra and analytic geometry. While 
+additional (mainly mathematical) knowledge may help the reader appreciate some of the ideas better, it is not required, and proofs that go outside of this scope 
 may be skipped altogether (they are provided for completeness). Additional proofs/derivations can usually be found in the appendix at the end of 
-every tutorial part. The code throughout this tutorial will be in C++, and while we intentionally try to avoid more complex programming notions, 
+every part. The code throughout this tutorial will be in C++ and GLSL, and while we intentionally try to avoid more complex programming notions, 
 we still use convenient tools like polymorphism to structure our implementation (while possibly affecting performance). The focus is on 
 simplicity and clarity rather than performance. In general the complexity increases with each subsequent part of the tutorial, however, 
 most mathematical notions and ideas are distributed throughout the different parts of the tutorial with the intention of keeping 
-the learning curve manageable.
+the learning curve manageable (we are fully aware that even with our best efforts the tutorial will be either too complex or too trivial 
+for the majority of the readers).
 
 ## Acknowledgements
 
 I thank Connor Fitzgerald and graphitemaster (CG discord nickname) for reviewing the code and making meaningful 
 suggestions on how to improve it. I also thank Matt Taylor, Michał Witanowski, and Piñata (CG discord nickname) for 
-reviewing the text and offering advice on its structure and ways in how to make it more accessible to a broader audience.
+reviewing the text and offering advice on its structure and ways in which to make it more accessible to a broader audience.
 
 This tutorial also wouldn't have been possible without all the great literature on ray tracing. Obviously that includes first and foremost 
 the papers cited above, but also several books and resources. A small part of the resources which have inspired and influenced this tutorial include: 
@@ -45,7 +46,7 @@ Peter Shirely's [Realistic Ray Tracing](https://dl.acm.org/citation.cfm?id=94041
 Scratch a Pixel's [website](https://www.scratchapixel.com/), 
 Dutre et al.'s [Advanced Global Illumination](https://dl.acm.org/citation.cfm?id=1196364), Eric Veach's PhD thesis: 
 [Robust Monte Carlo Methods for Light Transport Simulation](http://graphics.stanford.edu/papers/veach_thesis/), 
-Iliyan Georgiev's PhD thesis: [Path Sampling Techniques for Efficient Light Transport Simulation](http://www.iliyan.com/publications/ThesisPhD)
+Iliyan Georgiev's PhD thesis: [Path Sampling Techniques for Efficient Light Transport Simulation](http://www.iliyan.com/publications/ThesisPhD),
 Mathias Lang's PhD thesis: [Foundations of Realistic Rendering: A Mathematical Approach](https://publikationen.sulb.uni-saarland.de/handle/20.500.11880/26595),
 Christian Lessig's PhD thesis: [Modern Foundations of Light Transport Simulation](http://isgwww.cs.uni-magdeburg.de/graphics/projects/dissertation/index.html),
 the book [An Introduction to Ray Tracing](http://www.realtimerendering.com/raytracing/An-Introduction-to-Ray-Tracing-The-Morgan-Kaufmann-Series-in-Computer-Graphics-.pdf), 
@@ -57,14 +58,14 @@ A large list of books (some of which freely available) can be found at: [http://
 
 In general, terms in computer graphics often have multiple different meanings. In this tutorial **we will use ray tracing as an 
 umbrella term to mean any ray tracing technique**. This is often the case in literature as in most cases one traces rays, even if iteratively from 
-one point to another point (ray marching). Even for techniques such as sphere tracing or ray marching, when one might argue that the basic primitive 
-is "not exactly" the ray, or that one marches along the ray, **we will take the liberty of using ray tracing as an inclusive term**. 
+one point to another (ray marching). Even for techniques such as sphere tracing or ray marching, when one might argue that the basic primitive 
+is not exactly the ray, or that one marches along the ray, **we will take the liberty of using ray tracing as an inclusive term**. 
 However, we will not use the term ray tracing to include **beam tracing**, **cone tracing**, or similar techniques, since we consider those to be sufficiently 
 different (in contrast to sphere tracing which may be regarded as a numerical closest root search technique for an intersection along a ray).
 We will try our best to specify what technique we refer to when it is not obvious from the context, e.g. Whitted ray tracing, backward path tracing, 
 light tracing etc.
 
-This is also a good opportunity to introduce (rather informally) the basic definitions of these terms that we will be using:
+This is also a good opportunity to introduce (rather informally) the basic definitions of the terms that we will be using:
 
 With **ray casting** we will refer to the procedure of finding the closest intersection along a ray analytically (closed form solution), 
 note that sometimes this terms is used to include also volume tracing, or ray casting as used in older games (e.g. Wolfenstein, where a 
@@ -75,12 +76,13 @@ numerically (e.g. intersection with terrain height fields, fractals, higher orde
 
 We will use **Whitted (-style) ray tracing** to denote exclusively ray tracing as presented in Whitted's paper [#Whitted79], that is 
 shooting deterministic shadow rays for estimating direct illumination (for point, directional, cone etc. lights), and recursive 
-ray scattering for specular reflectiona and refraction. 
+ray scattering for ideal specular reflection and refraction. 
 
-We will use the term **distributed ray tracing** to refer specifically to the techniques described in [#Cook84], note that the boundary may 
-get a bit blurred between this term and path tracing (since it technically includes parts of path tracing, similar to Whitted's technique).
+We will use the term **distributed ray tracing** to refer specifically to the techniques described in [#Cook84], note that the boundary 
+between this term and path tracing may 
+get slightly blurred (since it technically includes parts of path tracing, similar to Whitted's technique).
 
-Finally, we will use **path tracing** in the sense of [#Kajiya86], that is the basic primitive with which we will be working will not 
+Finally, we will use **path tracing** in the sense of [#Kajiya86], meaning that the basic primitive with which we will be working will not 
 be single rays but rather whole light paths made up of a sequence of vertices starting from the camera and ending at a light source (or vice versa).
 The notion of a light path can be formalized in the framework of [Eric Veach's thesis](http://graphics.stanford.edu/papers/veach_thesis/) 
 specifically the path formulation of the rendering equation and the subsequent integral sum, note however that "the path formulation" was considered even 
@@ -89,36 +91,36 @@ in Kajiya's paper. That becomes evident if one refers to the edition of [Rubenst
 ## Chapter 1: Ray Casting
 
 In this chapter we go over some foundational ray casting topics along with some more advanced ones. We derive several ray-surface 
-intersection, introduce a number of integrators, present many different (non-physical) light sources, show how to apply textutures, 
-provide an introduction to spatial transformations (scaling, rotation, translation), and cosinder some miscellaneous topics such 
+intersection, introduce a number of integrators, present many different (non-physical) light sources, show how to apply textures, 
+provide an introduction to linear spatial transformations (scaling, rotation, translation), and consider some miscellaneous topics such 
 as quadric surfaces and constructive solid geometry (CSG).
 
 ### [Part 1: Intersecting a Sphere](ray_casting/part1/intersecting_a_sphere.md.html)
 
 In this part we introduce some operations with 3-dimensional vectors that we will be using throughout the tutorial, and provide a 
 reference vector library implementation. 
-We also go over saving our rendered image to disk in a very simple image format. Then we present a method to generate camera rays with which 
-to intersect the geometry in our virtual world and finally derive a ray-sphere intersection formula which we use to construct an algorithm 
-with which to visualize our sphere. This part concludes with rendering a sphere using two different shading methods. A teaser (which should 
-serve as motivation) for what the reader will be able to produce by the end of the chapter is shown below:
+We also go over how to save our rendered image to disk in a very simple image format. Then we present a method to generate camera rays with which 
+to intersect the geometry in our virtual world, and finally derive a ray-sphere intersection formula which we use to construct an algorithm 
+to visualize a sphere. This part concludes with rendering a sphere using two different shading methods. An example (which should 
+serve as motivation) of what the reader will be able to produce by the end of the chapter is shown below:
 <center><iframe width="640" height="360" frameborder="0" src="https://www.shadertoy.com/embed/ttlGWX?gui=true&t=10&paused=true&muted=true" allowfullscreen></iframe></center>
 
 ### [Part 2: Adding Integrators](ray_casting/part2/adding_integrators.md.html)
 
-In this section we concern ourselves mainly with shading, we also shortly go over how to implement intersections with more than one primitve. 
-We add several integrators: binary, inverse distance, color, normal, diffuse direct local illumination (objects do not cast shadows), 
+In this section we concern ourselves mainly with shading. We also go over how to implement intersections with more than one primitive. 
+We add several integrators: binary, inverse distance, color, normal, diffuse direct **local illumination** (objects do not cast shadows), 
 diffuse direct illumination (objects cast sharp shadows), transparency. We additionally introduce various (non-physical) light sources: ambient, point, 
 directional, cone, cylinder, and discuss how to compute the shading due to each light source type. The code size and complexity jump from the 
-first tutorial are actually pretty substantial, especially considering the fact that a lot of new notions are introduced. We delegate a more 
-formal derivation for the illumination due to the various light sources introduced to the appendix. The customary teaser can be found below (our hope is that it is 
-impressive enough to get the reader through this part):
+first tutorial are substantial, especially considering the fact that a lot of new notions are introduced. We delegate a more 
+formal derivation for the illumination, due to the various light sources introduced, to the appendix. The customary teaser can be found below (our hope is that it is 
+impressive enough to get the reader through this part also):
 <center><iframe width="640" height="360" frameborder="0" src="https://www.shadertoy.com/embed/Wtf3Wl?gui=true&t=10&paused=true&muted=true" allowfullscreen></iframe></center>
 
 ### Part 3: Transformations, Textures, CSG, Quadrics
 
 ## Chapter 2: Ray Marching and Sphere Tracing
 
-## Chapter 3: Whittedt Ray Tracing
+## Chapter 3: Whitted Ray Tracing
 
 ## Chapter 4: Distributed Ray Tracing
 

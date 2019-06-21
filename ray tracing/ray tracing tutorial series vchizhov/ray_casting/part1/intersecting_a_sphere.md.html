@@ -10,8 +10,9 @@ $\newcommand\inner[2]{\langle #1, #2 \rangle}$
 $\newcommand\norm[1]{\| #1 \|}$
 
 [Home](../../index.html)
+[Next](../part2/adding_integrators.md.html)
 
-# Ray Casting
+# Chapter 1: Ray Casting, Part 1: Intersecting a Sphere
 
 ## Prerequisites
 
@@ -29,7 +30,7 @@ Readers familiar with the basics should feel free to skim through or skip this p
 
 ### A simple 3D vector library
 Throughout the rest of the tutorial performing operations with 3D vectors will be commonplace. And while it is possible to type those out for each coordinate 
-every time they arise, it is neither practical nor efficient, so we make a slight detour to build a very simple (glsl inspired) 3D vector library. The structure 
+every time they arise, it is neither practical nor efficient, so we make a slight detour to build a very simple (GLSL inspired) 3D vector library. The structure 
 representing our 3-dimensional vector, that we denote *vec3*, will be made of 3 floating point numbers: $x,y,z$, and various aliases of those (see the code for 
 more details). If we have a vector $\vec{v}$ we will use the notation $v_0,v_1,v_2$ for its first, second, and third component respectively, alternatively 
 $\vec{v}=(v_0,v_1,v_2)$. We define the coordinatewise operations of addition $+$, subtraction $-$, multiplication $\cdot$, and 
@@ -65,7 +66,7 @@ width as an integer value, the height as an integer value, and the maximum color
 of those. An example of such a header for an image of dimensions $1024\times 768$, with a maximum color 
 value of $2^8-1 = 255$ looks like this:
 
-```
+```cpp
 P3
 1024 768
 255
@@ -91,7 +92,7 @@ for(int y=0;y&ltheight; ++y)
 file.close();
 ```
 
-The clamp function is analogous to its glsl counterpart and limits the value to the given range (and is implemented coordinatewise for a vector, see the code for 
+The clamp function is analogous to its GLSL counterpart and limits the value to the given range (and is implemented coordinatewise for a vector, see the code for 
 more details). 
 The clamping is done in order to keep values in the range $[0,255]$.
 
@@ -198,7 +199,7 @@ At the core of ray casting lies finding the closest intersection between a ray a
 can be done for a single sphere.
 
 A sphere is defined mathematically as the set of points that are equidistant (the distance being $R$ the radius) 
-from a certain point ($\vec{c}=(c_x,c_y,c_z)$ the center of the sphere). We can formalize this using statement by using the norm, since from the above definition 
+from a certain point ($\vec{c}=(c_x,c_y,c_z)$ the center of the sphere). We can formalize this statement by using the norm, since from the above definition 
 we know that if a point $\vec{p}$ is at a distance $R$ from $\vec{c}$ then it lies on the sphere, formally:
 
 $$\norm{\vec{p}-\vec{o}} = R$$

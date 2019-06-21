@@ -9,35 +9,39 @@ $\newcommand{\coloneqq}{\mathrel{\mathop:}=}$
 $\newcommand\inner[2]{\langle #1, #2 \rangle}$
 $\newcommand\norm[1]{\| #1 \|}$
 
+[Prev](../part1/intersecting_a_sphere.md.html)
 [Home](../../index.html)
 
-# Ray casting
+# Chapter 1: Ray Casting, Part 2: Adding Integrators
 
 ## Prerequisites
 
-The prerequisites for this part are similar to the ones from the previous one. The extra addition is virtual methods in order to make 
+The prerequisites for this part are similar to the ones for the previous one. The extra addition is virtual methods in order to make 
 an easily extensible and modular *Integrator* class. Note that the same could have been achieved simply by using templates or different 
-function names, since an *Integrator* doesn't carry any state just yet. On the mathematics side the new material is regarding computing normals 
-of surfaces, but the formal derivation of this goes a bit outside of the scope of the tutorial so it is presented only in the appendix. A little bit 
-of radiometry is also introduced in order to deal with diffuse shading and point lights. This is done only on an intuitive level, and 
-the actual proof is also delefated to the appendix.
+function names, since an *Integrator* doesn't carry any state just yet (see the shadertoy [code](https://www.shadertoy.com/view/Wtf3Wl) 
+for a simpler implementation). On the mathematical side, some properties regarding the dot product are introduced, also a way to compute the
+normal of an implicit surface is presented in the appendix. Some more advanced radiometric and mathematical concepts are also introduced in 
+the appendix to motivate the shading due to the various light sources. 
+It is highly recommended that beginners ignore the topics discussed in the appendix since those are quite advanced and are presented 
+only for completeness.
+
 
 ## Math recap
 
 In the previous chapter coordinate-wise vector operations were introduced, as well as the inner product, the cross product, and the norm.
-The linearity and commutativity of the inner product were used to derive the sphere intersection. One can find the two propeties below:
+The linearity and commutativity of the inner product were used to derive the sphere intersection. One can find the two properties below:
 
 $$\inner{\alpha\vec{u}+\beta\vec{v}}{\vec{w}} = \alpha\inner{\vec{u}}{\vec{w}} + \beta\inner{\vec{v}}{\vec{w}} \quad \text{linearity}$$
 $$\inner{\vec{u}}{\vec{v}} = \inner{\vec{v}}{\vec{u}} \quad \text{commutativity}$$
 
-The norm of a vector was defined which is used to measure its length (magnitude) and was defined through the inner product as:
+The norm of a vector was defined, which is used to measure its length (magnitude), and a relation to the inner product was presented:
 $$\norm{\vec{v}} = \sqrt{\inner{\vec{v}}{\vec{v}}}$$
 
-Through it the notion of normalized/unit length vector was introduced. A vector $\vec{v}$ is unit length (has magnitude $1$) iff:
+Through it the notion of normalized/unit length vectors was introduced. A vector $\vec{v}$ is unit length (has magnitude $1$) if:
 $$\norm{\vec{v}} = \sqrt{1} = 1 = \inner{\vec{v}}{\vec{v}}$$
 
 The notion of perpendicular/orthogonal vectors $\vec{u},\vec{v}$ was generalized through the inner product. Two vectors $\vec{u},\vec{v}$ 
-are said to be orthogonal iff:
+are said to be orthogonal if:
 $$\inner{\vec{u}}{\vec{v}} = 0$$
 
 Additionally a set of vectors was defined to be orthonormal if every two vectors from it were orthogonal and each vector was unit length.
@@ -45,7 +49,7 @@ A basis was said to be orthonormal if its set of vectors was orthonormal.
 
 The parametric ray equation was defined as: $\vec{r}(t) = \vec{o} + t\vec{d}$
 
-And the canoncial sphere equation was presented: $\norm{\vec{p}-\vec{c}}^2 = R^2$
+The canonical sphere equation was presented: $\norm{\vec{p}-\vec{c}}^2 = R^2$
 
 A simple linear mapping from screen coordinates to virtual film coordinates was also derived.
 
@@ -54,229 +58,540 @@ A simple linear mapping from screen coordinates to virtual film coordinates was 
 
 In this part of the tutorial we concern ourselves with shading our sphere and extending the framework to be able to intersect 
 a collection of spheres. We introduce several integrators such as the binary integrator from the first part, as well as a distance 
-integrator. We add an integrator to visualize normals, and also one for local diffuse illumination (similar to rasterized graphics). We 
-compute illumination from light sources so we introduce point and directional light sources. Finally we add transparency, and 
-a diffuse integrator that takes into account the visibility of the light source (it can produce sharp shadows). We also introduce gamma 
-correction to properly render the inverse square point light falloff. 
+integrator. We add an integrator to visualize normals, and also one for diffuse direct local illumination (similar to rasterized graphics). We need to 
+compute illumination from light sources so we introduce various (non-physical) light source types. Finally we add transparency, and 
+a diffuse integrator that takes into account the visibility of the light source (it can produce sharp shadows, and is the closest of our integrators 
+to Appel's work [#Appel68]). We also introduce gamma correction to properly present our 
+image on screen.
 
-The term integrator is used since it is consistent with the extensions that will be implemented in the Whitted style ray tracing, 
-distributed ray tracing, and path tracing parts of the tutorial. Intuitively it denotes an entity that sums up values (possibly  
-infinitely many values that are infinitely small). The connection to rendering can be seen from the fact that each pixel is made 
-up of infinitely many points, each corresponding to a point in the virtual world that we are trying to render. We want to estimate 
-the average color of those, in order to color the pixel accurately. Another probably more intuitive example of integration is when 
-the process of summing the light contribution of each light in the local diffuse and diffuse integrators, the emphasis being on summing. 
-In later parts of the tutorial we will consider light sources with an area (such as a spherical lamp or an environment map), in which 
-case we will need to sum the contribution from the infinitely many points making up the light source.
+The term integrator is used since it is consistent with the extensions that will be implemented in the chapters on Whitted ray tracing, 
+distributed ray tracing, and path tracing. Intuitively it denotes an entity that sums up values (possibly infinitely many values that are 
+infinitely small). The connection to rendering can be seen from the fact that each pixel is made up of infinitely many points, each corresponding 
+to a point in the virtual world. We want to estimate the average color of all of those (infinitely many points), in order to assign the correct color to that pixel. 
+Another possibly more intuitive example of integration is the process of summing the light contribution from each light in the direct 
+illumination integrators, the emphasis being on summing. A similar case may be presented for rendering textures in rasterized graphics where integration 
+is tightly connected to sampling and the necessity for techniques like mip mapping. In later parts of the tutorial we will consider light sources with an 
+area (such as a spherical lamp or an environment map), then we will need to sum the contribution from the infinitely many points making up the light source. 
+Readers can find below the two most common mathematical symbols for summation
 
-### Collection intersection
 
-We introduce a *Scene* class which can hold a collection of primitives that are to be rendered. For the *Scene* class we provide 
-an intersect method to find the closest intersection of a ray with the collection of surfaces in the scene.
-We use a dynamic array (*std::vector&lt Sphere &gt*) to hold the spheres, which allows adding more primitives to the collection at run time. 
+Sigma $\sum$ - the mathematical symbol (a Greek letter) used to denote sums:
+$$\sum_{i=a}^{b}{f_i}$$
 
-The intersect method iterates over all primitives, calls each primitive's intersect function, and if there is an intersection that is 
-closer than the currently closest intersection, it sets it as the closest intersection (the initially closest intersection distance 
-can be set to infinity). This routine essetially finds the valid intersection with minimum distance (that is the closest intersection), 
-or returns no intersection (an intersection at infinity which we treat as there being no intersection). This is exactly the result 
-that we want, since any point behind the closest one is occluded by it along the direction of the ray (in the abscence of transparency). 
+Integral $\int$ - the mathematical symbol used to denote integration (infinite sum of infinitely small elements):
+$$\int_{\Omega}{f(\vec{x})\,d\mu(\vec{x})}$$
+
+
+### Intersecting a collection of primitives
+
+One usually wants to be able to render more than one object. To achieve this we introduce a *Scene* class which can hold a collection of 
+primitives (and lights). For the *Scene* class we provide a ray intersection method to allow finding the closest intersection of a ray with the collection of 
+surfaces in the scene. We use a dynamic array (*std::vector&lt Sphere &gt*) to hold the spheres, which allows adding more primitives to 
+the collection at run time. 
+
+The intersect method iterates over all primitives, calls each primitive's intersection function, and if there is an intersection that is 
+closer than the currently closest intersection it sets it as the closest intersection (the initially closest intersection distance 
+is set to infinity). This routine essentially finds a valid intersection with minimum distance from the ray origin (the closest intersection), 
+or returns no intersection in the absence of a valid intersection (an intersection at infinity which we treat as there being no intersection). 
+One needs the closest intersection, since for opaque objects any point behind the closest one is occluded by the closest one along the direction 
+of the ray. 
 Note the similarity to the algorithm used to find the minimum element of an array. The only difference is that we do not keep an array 
-of the valid intersection distances, but perform the check iteratively after computing the intersection for each iteration. 
+of the valid intersection distances (this is also a valid option, but it would require extra memory) but perform the comparison iteratively 
+after computing the intersection with the current object for each iteration. 
 
-We will additionally want to return extra information for an intersection like the color of the intersected point and the normal at it 
-in order to be able to shade it. For that reason we return a structure of the color, normal, and distance at the intersection.
+Since we want to shade our surfaces in many different ways, we will need some additional information for any valid intersection. 
+This includes the distance from the ray origin to the intersection , the position of the intersection, and the normal and color of 
+the surface at this position. We create a structure *Intersection* to hold this data, and modify the intersection methods of the 
+*Sphere* and the *Scene* to return an object of this type.
 
 ```cpp
+struct Intersection
+{
+	float dist;
+	vec3 pos;
+	vec3 normal;
+	vec3 color;
+};
+```
 
+An example implementation of the structures and algorithms discussed can be found in *scene.hpp* and *ray.hpp*.
+
+
+### Implementing debug integrators
+
+We define an *Integrator* class, which will serve as a base class for all kind of different rendering methods - from a plain binary (black and white) image 
+renderer as in the previous section, to a renderer supporting diffuse illumination with shadows. The *Integrator* class will expose two virtual 
+functions: a function to render a scene as seen by a specific camera storing the result in an *Image* object, and a function that returns the 
+light energy that arrives at the camera along some ray. The function is named radiance, since the radiometric term for the "light energy" that we are computing 
+is radiance.
+```cpp
+virtual void render(Image& image, const Camera& camera, const Scene& scene) const {...}
+virtual vec3 radiance(const Scene& scene, const Ray& ray) const {...}
+```
+The *render(image, camera, scene)* method should iterate over all pixels of the image, spawn rays from the camera through the center of each pixel, 
+and evaluate the color at the pixel by calling *radiance(scene, ray)* with said ray. 
+
+We add more spheres to the scene in order to test out the new intersection function allowing us to intersect a collection of spheres:
+```cpp
+// Add some scene geometry
+add(scene, Sphere(vec3(0, 0, 4), 1.0f, vec3(1, 0.5f, 0.1f)));
+add(scene, Sphere(vec3(-1, 0, 2.5f), 1.0f, vec3(0.1f, 0.5f, 1.0f)));
+
+// a large sphere for the ground
+add(scene, Sphere(vec3(0, -1001, 0), 1000.0f, vec3(0.3f, 1, 0.3f)));
+```
+We also modify the *Sphere* class to hold a color parameter which is represented by the third argument in the constructors above (it's used later for color shading).
+
+The first integrator that we will add is a binary integrator which is simply a reformulation of the code we had for rendering the sphere in the previous section. 
+In this case the function *radiance*  simply returns white if there's an intersection and black otherwise:
+
+```cpp
+vec3 radiance(const Scene& scene, const Ray& ray) const final
+{
+	bool doesIntersect = valid(scene(ray));
+	return vec3(static_cast<float>(doesIntersect));
+}
+```
+
+![Binary rendering of a collection of spheres](images/spheres_binary_640_480.png)
+
+Another more interesting integrator visualizes the reciprocal distance of points to the camera similarly to what we had in the previous part:
+```cpp
+vec3 radiance(const Scene& scene, const Ray& ray) const final
+{
+	return vec3(1.0f/scene(ray).dist);
+}
+```
+
+![Inverse distance rendering of a collection of spheres (gamma corrected)](images/spheres_depth_640_480.png)
+
+Note that the fact that $dist$ is precisely the distance from the ray origin to the intersection (because the ray is normalized) was used in this case.
+Unlike in the first part we use $\frac{1}{dist}$ rather than $\frac{1}{dist^2}$, this is because we will introduce gamma correction later on (which will account for 
+the square) when it becomes obvious that it is required for correct visualization.
+
+We can add an integrator to shade each sphere in its color assigned at construction:
+```cpp
+vec3 radiance(const Ray& ray, const Scene& scene) const final
+{
+	Intersection intersection = scene.intersect(ray);
+	vec3 col = vec3(0); // black background
+	if (intersection)
+	{
+		return scene(ray).color;
+	}
+	return col;
+}
+```
+
+![Flat color rendering of a collection of spheres (gamma corrected)](images/spheres_color_640_480.png)
+
+Note that the above image is rendered with gamma correction (without you should get a darker image).
+
+The first more complex intergrator that we consider is one used to visualizes the normals of the intersected surfaces:
+```cpp
+vec3 radiance(const Scene& scene, const Ray& ray) const final
+{
+	Intersection intersection = intersect(scene, ray, 0.0f, INFINITY);
+	float cosRayNormal = dot(ray.d, intersection.normal);
+	vec3 normal = (cosRayNormal < 0.0f) ? intersection.normal : -intersection.normal;
+	return float(valid(intersection))*(0.5f*normal + vec3(0.5f));
+}
+```
+
+In case no surface is intersected we return black, that's what the multiplication by *valid(intersection)* serves for in the return statement. Otherwise we 
+return a RGB encoding of the normal. Since a normal is in $[-1,1]^3$, but colors are in $[0,1]^3$, we additionally map $[-1,1]^3$ to $[0,1]^3$. This is achieved 
+by multiplying by $0.5$ and adding $0.5$ to each normal coordinate (the linear mapping can be derived similarly to how we derived the mapping in part 1, and is 
+left as an exercise for the reader).
+There's a small but important detail that we must take into account in order to draw the correct normals on the inside of objects. In our framework we consider 
+surfaces as two-sided. That means that we always need to return the normal that faces in the correct direction with respect to the intersecting ray, for example 
+if a ray intersects a sphere from the inside (if the camera is inside the sphere), we need to flip the normal, since sphere intersection always returns an outwards facing normal. 
+To achieve this we use a property of the inner product in Euclidean space (the usual 3-dimensional space we work in):
+$$\inner{\vec{u}}{\vec{v}} = \norm{\vec{u}}\norm{\vec{v}}\cos\angle(\vec{u},\vec{v})$$
+It lets us find out the angle between two vectors. This is applicable to our problem, since we want to find out whether a ray intersects the 
+sphere surface from inside or from outside. If a ray intersect the surface from outside, then the angle between the outward facing normal and the 
+ray direction is greater than $90$ degrees, and vice versa. Thus we need to check whether $\angle(\vec{n},\vec{d}) &gt 90$, which is equivalent (since $\cos$ is 
+a monotonically decreasing function in $[0,\pi]$) to: $\cos\angle(\vec{n},\vec{d}) &lt 0$, or precisely what we have as a condition in the code. If this is not the case, the ray direction 
+and outward facing normal form an acute or right angle, meaning that the ray intersected the sphere from the inside (or grazed it tangentially). In that case we flip 
+the normal in order to get the correct inside facing normal.
+
+![Normals to RGB rendering of a collection of spheres (gamma corrected)](images/spheres_normal_640_480.png)
+
+Often the integrators above are used for debugging, especially in rasterization graphics, where the title of the subsection comes from. 
+The normal and depth visualization especially are quite popular as a visual debugging tool.
+
+
+### Implementing a transparency integrator and mitigating self-intersection issues
+
+The transparency integrator renders each object using a transparent material based on the object's color.
+Whenever a ray intersects an object the light contribution from the background is attenuated, and the ray is regenerated from the current intersection in 
+order to keep intersecting the surfaces after it. This essentially blends all intersected surfaces until the ray intersects the background or the max iteration 
+count is achieved. We allow up to 11 iterations, which is enough to render 5 transparent spheres (each can have at most 2 intersections, for a total of 10, the 
+additional iteration is for the "intersection" with the background). 
+The code for the *radiance* method can be found below:
+
+```cpp
+vec3 radiance(const Scene& scene, const Ray& r) const final
+{
+	vec3 color = vec3(1);
+	Ray ray = r;
+
+	for (int i = 0; i < 11; ++i)
+	{
+		Intersection intersection = intersect(scene, ray, 0.0, INFINITY);
+		if (!valid(intersection)) return color;
+
+		float cosRayNormal = dot(ray.d, intersection.normal);
+		vec3 normal = (cosRayNormal < 0.0f) ? intersection.normal : -intersection.normal;
+
+		color *= intersection.color;
+		ray = Ray(intersection.pos - EPSILON * normal, ray.d);
+	}
+	return vec3(0);
+}
+```
+The code for the normal flip is the same as in the normals integrator.
+It is important to emphasize the role of the offset of the regenerated ray's origin by `-EPSILON * normal` (where *EPSILON*, also denoted as $\epsilon$, is some small value, in our case 
+$0.0001$). This is done in order to push the regenerated ray's 
+origin on the other side of the intersected surface. This is necessary since floating point error may cause the intersection point computed to appear on the same 
+side from which the ray intersected the surface, in which case it will intersect the surface in the same place again. We specifically offset along the normal, since it is the 
+direction of fastest increase/decrease of our function (a well-known property of the gradient), and thus provides the locally shortest path to move to the other side of the surface. 
+Note that avoiding self-intersection can also be achieved by setting *minT* in the intersection method to some multiple of *EPSILON*, this is not ideal however, 
+since the required offset is often several times larger than the one along the normal (on our machine $30$ times larger).
+Without any offset one gets the following image, which clearly showcases the self-intersection issues due to floating point round off error:
+
+![Transparent render of a collection of spheres showcasing floating-point error artifacts (gamma corrected)](images/spheres_transparency_error_640_480.png)
+
+![Transparent render of a collection of spheres with an offset of $1\epsilon$ (gamma corrected)](images/spheres_transparency_1eps_640_480.png)
+
+Notice that we still get some minor artifacts on the ground sphere even with an offset of $-\epsilon$ along the normal. The problem can't be entirely eliminated, since an offset of just $\epsilon$ 
+results in some minor ground sphere artifacts (because of the large scale of the ground sphere), while for example an offset of $3\epsilon$ removes those artifacts but 
+results in a small "hole" on the bottom of the orange sphere (because of its smaller scale). This illustrates the fact that the offset should be proportional to the scale of 
+the objects and not constant if one wants to compensate adequately for floating point errors. We won't pursue this issue further - the reader should feel free to 
+leave the offset as $3\epsilon$ or $1\epsilon$ depending on his preference. We refer the interested reader to chapter 7 of "Ray Tracing Gems"[#Haines2019] for a 
+numerically more robust ray-sphere intersection algorithm.
+
+Note that a transparency integrator that eliminates this problem entirely and is a lot more efficient ($O(n)$ vs $O(n^2)$) can be devised. 
+This can be achieved by doing the blending with just a single ray while we perform the closest intersection search. This however requires creating new 
+surface intersection methods that compute all of the intersections of a surface and blend them, and equivalent methods for the *Scene* class. 
+We will not implement such an integrator, but the reader should feel free to do so (it's by no means a requirement to understand later topics however).
+
+
+### Implementing diffuse integrators
+
+Finally we implement two diffuse direct illumination integrators that are similar to the "integrators" (shaders) used in rasterized graphics and in Appel's paper [#Appel68], respectively.
+We term the integrators "diffuse" since we implement them only for diffuse/Lambertian materials (bidirectional reflectance distribution functions - BRDFs). In later chapters 
+we introduce more expressive material models (BRDFs). We describe the integrators as "direct illumination", since they shade surfaces only by considering light arriving 
+directly from a light source, that means that no indirect illumination is considered (e.g. effects like color bleeding are missing). We differentiate between the two integrators 
+by whether they are "local" or "non-local". 
+
+The local diffuse integrator acts similarly to shaders in rasterized graphics - where each surface point is shaded in isolation of all 
+others. More specifically this means that occluders between the light source and the point being shaded are ignored. That implies that one does not naturally get non-local 
+effects such as shadows or ambient occlusion (note that both of those can technically be added in rasterized graphics, albeit imperfectly for the most part). On the other hand this 
+also allows to not cast shadow rays towards the light sources, resulting in better performance. The non-local diffuse integrator is similar to the integrator used in Appel's paper [#Appel68]. Except for primary rays, it also 
+traces shadow rays between the point being shaded and the light sources, and if an intersection occurs within that range, then the contribution from that light source is ignored 
+(the light is occluded from the point of view of the point being shaded). This naturally produces shadows due to direct illumination and occlusion.
+
+In order to render an image that is not entirely black, there must be at least one light source illuminating the scene. 
+Thus we extend the *Scene* class to also hold a collection of light sources. We make a class to represent a point light source - it holds the intensity (color and strength) of the 
+light source and its position. A point light source is a non-physical light source which assumes that light is emitted from a single point.
+
+```cpp
+struct PointLight
+{
+	vec3 intensity;		//!< The color and strength of the light
+	vec3 origin;		//!< The position of the light
+};
+```
+
+In order to decouple light source types from shading, we also define a light sample class which holds data produced by sampling a light source 
+(this data will be used for shading).
+
+```cpp
+struct LightSample
+{
+	vec3 radiance;		//!< radiance traveling toward the point being shaded
+	vec3 direction;		//!< direction from the point being shaded to the light source sample
+	float distanceToLight;	//!< distance to the light source sample along the direction
+};
+```
+
+Proceeding with the diffuse integrator, we need to compute the color at sampled surface points. To compute the color at a surface point $\vec{p}$, 
+we need to iterate over all lights and sum their contribution (since radiance is additive: shining two lights 
+with equal intensity at the same spot makes it twice as bright as shining only one). The RGB contribution (radiance) $\vec{a}_i$ scattered towards the camera 
+along the intersecting ray due to light source $i$ can be computed as:
+
+$$\vec{a}_i=\vec{c}\vec{I}_i\frac{\cos\theta_i}{\norm{\vec{l}_i-\vec{p}}^2} = \vec{c}\vec{I}_i\frac{\inner{\vec{n}}{\vec{l}_i-\vec{p}}}{\norm{\vec{l}_i-\vec{p}}^3}$$
+
+Where point light $i$ has position $\vec{l}_i$ and intensity $\vec{I}_i$  (you can find a derivation of this formula in the appendix in the subsection 
+"Irradiance due to a point light". It is included only for completeness - read at your own risk). The color of the intersected point $\vec{p}$ 
+is $\vec{c}$, and $\vec{n}$ is its normal. The $\cos\theta_i$ term is due to [Lambert's cosine law](https://en.wikipedia.org/wiki/Lambert%27s_cosine_law), 
+where $\theta_i$ is the angle between the light vector ($\vec{l}_i-\vec{p}$) and the surface normal $\vec{n}$. Intuitively it states that the more shallow the angle 
+with the surface the light arrives at, the lower the intensity, since the light energy (flux) gets distributed over a larger area. 
+
+
+Very conveniently the cosine can be computed by employing a property of the dot product that we mentioned earlier
+$$\sum_{i=1}^{3}{u_iv_i} = \inner{\vec{u}}{\vec{v}} = \norm{\vec{u}}\norm{\vec{v}}\cos\angle(\vec{u},\vec{v})$$
+$$\cos\angle(\vec{u},\vec{v}) = \frac{\inner{\vec{u}}{\vec{v}}}{\norm{\vec{u}}\norm{\vec{v}}} = \frac{\sum_{i=1}^{3}{u_iv_i}}{\norm{\vec{u}}\norm{\vec{v}}}$$
+
+In our case $\norm{\vec{n}} = 1$, thus we only need to additionally divide by $\norm{\vec{l}_i-\vec{p}}$. The $\frac{1}{{\norm{\vec{l}_i-\vec{p}}^2}}$ term is a 
+result of the [inverse-square law](https://en.wikipedia.org/wiki/Inverse-square_law), which states that light intensity decreases with the inverse-square of the distance from the light source. 
+Intuitively, this is because light energy gets distributed across a larger surface the further away we are in space - 
+imagine a ball of radius $r$ around the light source. The area of said ball is proportional to $r^2$, so with increasing distance, the light energy gets distributed 
+"more thinly" over the surface proportionally to $\frac{1}{r^2}$. For a more formal derivation see the subsection "Irradiance due to a point light" in the 
+appendix.
+
+The componentwise multiplication by $\vec{c}$ accounts for the surface absorption, and the pointwise  multiplication by $\vec{I}_i$ accounts for the light intensity. 
+The final contribution after iterating over all light sources is the sum of all contributions $\sum_{i=1}^{k}{\vec{a}_i}$, where $k$ is the number of lights in the 
+scene. 
+
+The code implementing all of these ideas can be found below:
+
+```cpp
+vec3 radiance(const Scene& scene, const Ray& ray) const final
+{
+	Intersection intersection = intersect(scene, ray, 0.0f, INFINITY);
+	if (!valid(intersection)) return vec3(0);
+
+	vec3 color = vec3(0);
+	vec3 pos = intersection.pos;
+	vec3 albedo = intersection.color * INV_PI;
+	float cosRayNormal = dot(ray.d, intersection.normal);
+	vec3 normal = (cosRayNormal < 0.0f) ? intersection.normal : -intersection.normal;
+
+	// iterate over all point light sources and accumulate their contribution
+	for (int i = 0; i < scene.pointLights.size(); ++i)
+	{
+		LightSample lightSample = sampleRadiance(scene.pointLights[i], pos);
+		vec3 radiance = lightSample.radiance;
+		vec3 direction = lightSample.direction;
+		float cosLambert = max(0.0f, dot(normal, direction));
+
+		float visibility = 1.0f;
+		color += albedo * radiance * cosLambert * visibility;
+	}
+	return color;
+}
+```
+
+Note that we take the maximum of $0$ and the cosine, since we assume that surfaces are opaque, so no light can arrive from below the surface.
+Sampling the radiance from a point light is done through:
+```cpp
+
+LightSample sampleRadiance(const vec3& pos) const
+{
+	LightSample lightSample;
+
+	vec3 posToLight = origin - pos;
+	float distanceToLight = length(posToLight);
+	posToLight /= distanceToLight;
+	float squaredDistanceToLight = distanceToLight * distanceToLight;
+	
+	lightSample.direction = posToLight;
+	lightSample.radiance = intensity / squaredDistanceToLight;
+	lightSample.distanceToLight = distanceToLight;
+	
+	return lightSample;
+}
 
 ```
 
-We define an *Integrator* class, which will serve as a base class for all kinds of different rendering methods - from a plain binary (black and white) image renderer as in the previous section, to a renderer supporting diffuse illumination with shadows. The \textit{Integrator} class will expose two virtual functions: a function to render a scene as seen by a specific camera saving the result in an \textit{Image} object, and a function that returns the light energy that arrives at the camera along some ray. The function is named radiance, since the radiometric term for the "light energy" that we are computing is radiance.
-\begin{lstlisting}[language=C++]
-virtual void Integrator::render(Image& image, const Camera& camera,
-const Scene& scene) const {...}
-virtual void Integrator::radiance(const Ray& ray, 
-const Scene& scene) const {...}
-\end{lstlisting}
+After rendering the image experienced readers may notice that the supposedly inverse-square falloff doesn't look quite right. 
+This is because we are computing the colors in linear space and saving them as such, but most image viewers expect gamma corrected images. 
+Even if they didn't, we would still be making poor use of the 8 bits per channel if we were to linearly encode the colors, since [human perception is not 
+linear](https://en.wikipedia.org/wiki/Weber%E2%80%93Fechner_law). Applying gamma correction to the image before saving only requires raising the result to the power of $\frac{1}{2.2}$, 
+preferably after having gotten rid of negative values by using a $\max(0,col)$ to avoid domain/range errors.
 
 
-A reference implementation of the outlined algorithm can be found in the supplementary code.
-We add more spheres to the scene in order to test out the new functionality (the last \textit{vec3} arguments are colors for the surfaces):
-\begin{lstlisting}[language=C++]
-scene.surfaces.push_back(new Sphere({ 0, 0, 3 }, 1, 
-{ 1, 0.3f, 0 }));
-scene.surfaces.push_back(new Sphere({ -1.5f, 0, 5 }, 1, 
-{ 0.2f, 0.7f, 0.1f }));
-scene.surfaces.push_back(new Sphere({ 0, -1001, 3 }, 1000, 
-vec3(0.2f, 0.4f, 0.8f)));
-\end{lstlisting}
+![Non-gamma corrected local diffuse rendering of a collection of spheres](images/spheres_diffuse_local_no_gamma_640_480.png)
 
-\subsubsection{Adding various integrators}
-Our first integrator will be simply a more organized reformulation of the code we had for rendering the sphere in the previous section. The \textit{render(image, camera, scene)} method should iterate over all pixels of the image, spawn rays from the camera through the center of each pixel, and evaluate the color at the pixel by calling \textit{radiance(ray, scene)} with said ray. The function \textit{radiance} in this case simply returns white if there's an intersection and black otherwise:
-\begin{lstlisting}[language=C++]
-vec3 radiance(const Ray& ray, const Scene& scene) const final
-{
-    return vec3(scene.intersect(ray));
-}
-\end{lstlisting}
+![Gamma corrected local diffuse rendering of a collection of spheres](images/spheres_diffuse_local_640_480.png)
 
-Another more interesting integrator visualizes the reciprocal distance of points to the camera, we will call it \textit{IntegratorDepth} and it will inherit from $\textit{Integrator}$, so we only need to overload \textit{radiance} to return a color based on the reciprocal distance:
-\begin{lstlisting}[language=C++]
-vec3 radiance(const Ray& ray, const Scene& scene) const final
-{
-    return vec3(1.0f/scene.intersect(ray).t);
-}
-\end{lstlisting}
-Note that the fact that $t$ is precisely the distance from the ray origin to the intersection (because the ray is normalized) was used in this case.
-\begin{figure}[h]
-\centering
-\includegraphics[width=\textwidth]{spheres_depth_640_480.png}
-\caption{Reciprocal depth rendering of a collection of spheres}
-\end{figure}
 
-We can also create an intergrator (\textit{IntegratorNormal}) to visualizes the normals of the intersected surfaces:
-\begin{lstlisting}[language=C++]
-vec3 radiance(const Ray& ray, const Scene& scene) const final
-{
-	Intersection intersection = scene.intersect(ray);
-	vec3 col = vec3(0); // black background
-	if (intersection)
-	{
-		vec3 intersectionPoint = ray(intersection.t);
-		// maps normals from [-1,1]^3 to [0,1]^3 (xyz -> rgb)
-		col = 0.5f*intersection.s->normal(intersectionPoint) + vec3(0.5f);
-	}
-	return col;
-}
-\end{lstlisting}
 
-\begin{figure}[h]
-\centering
-\includegraphics[width=\textwidth]{spheres_normal_640_480.png}
-\caption{Normals to RGB rendering of a collection of spheres}
-\end{figure}
+We'll wrap up this subsection by implementing an integrator similar to the one in Appel's paper [#Appel68] - with diffuse shading and shadows. To this end, we'll add a method 
+*intersectAny* to the *Scene* class, which as an optimization terminates the loop over all primitives early if the ray intersects any surface 
+(regardless if it's the closest) in the range $(minT,maxT)$. The purpose of this intersection method would be to check for occlusion between the point light source 
+and the point being shaded (i.e. to check if it's in shadow with respect to the given light source). The integrator is a straightforward extension of 
+*IntegratorDiffuseLocal*, the main difference being that contributions from occluded light sources are ignored, and an offset is applied to the shadow ray's origin 
+in order to avoid self-intersection artifacts (the shadow ray is the ray shot towards the light source. The figure below showcases 
+"shadow acne" artifacts, if one forgets to offset the shadow ray's origin).
 
-To shade each sphere in its color we can add an integrator \textit{IntegratorColor}:
-\begin{lstlisting}[language=C++]
-vec3 radiance(const Ray& ray, const Scene& scene) const final
-{
-	Intersection intersection = scene.intersect(ray);
-	vec3 col = vec3(0); // black background
-	if (intersection)
-	{
-		col = intersection.s->col;
-	}
-	return col;
-}
-\end{lstlisting}
 
-\begin{figure}[h]
-\centering
-\includegraphics[width=\textwidth]{spheres_color_640_480.png}
-\caption{Flat color rendering of a collection of spheres}
-\end{figure}
-
-Another more complex and interesting integrator \textit{IntegratorDiffuseLocal} renders the surfaces with diffuse local illumination, similarly to rasterized graphics (or rather similarly to Appel's work since it came long before that). For that purpose we'll need a point light class which we'll call \textit{LightPoint} and it will have a \textit{vec3} field describing the point light's position in 3D space, and a \textit{vec3} field describing its RGB intensity. We can add a \textit{std::vector} of point lights to the \textit{Scene} structure in order to access those easily in the integrator. 
-
-To compute the color at an intersection point $\vec{p}$, we need to iterate over all lights and sum their contribution (since radiance is additive - shining 2 lights with equal intensity on the same spot makes it twice as brigh as using just one). The RGB contribution (radiance) $\vec{a}_i$ reflected towards the camera along the intersecting ray due to light source $i$ can be computed as:
-$$\vec{a}_i=\vec{c}\vec{I}_i\frac{\cos\theta_i}{\norm{\vec{l}_i-\vec{p}}^2} = \vec{c}\vec{I}_i\frac{\inner{\vec{n}}{\vec{l}_i-\vec{p}}}{\norm{\vec{l}_i-\vec{p}}^3}$$
-Where point light $i$ has position $\vec{l}_i$ and intensity $\vec{I}_i$  (you can find a derivation of this formula in the appendix in subsection \ref{appendix:Irradiance due to a point light} , for more advanced readers or more curious beginners - read at your own risk). The color of the intersected point $\vec{p}$ is $\vec{c}$, and $\vec{n}$ is its normal. The $\cos\theta_i$ term is due to Lambert's cosine law\cite{LambertLaw}, where $\theta_i$ is the angle between the light vector ($\vec{l}_i-\vec{p}$) and the surface normal $\vec{n}$. Intuitively it states that the more shallow the angle with the surface the light arrives at, the lower the intensity, since the light energy (flux) gets distributed over a larger area (see Fig.\ref{fig:Lambert cosine law illustration}). 
-\begin{figure}[h]
-\centering
-\caption{Figure illustrating Lambert's cosine law required}
-\label{fig:Lambert cosine law illustration}
-\end{figure}
-
-Very conveniently the cosine can be computed by employing one of the properties of the dot product, namely:
-$$\sum_{i=1}^{3}{u_iv_i} = \inner{\vec{u}}{\vec{v}} = \norm{\vec{u}}\norm{\vec{v}}\cos\angle(\vec{u},\vec{v})$$
-$$\cos\angle(\vec{u},\vec{v}) = \frac{\inner{\vec{u}}{\vec{v}}}{\norm{\vec{u}}\norm{\vec{v}}} = \frac{\sum_{i=1}^{3}{u_iv_i}}{\norm{\vec{u}}\norm{\vec{v}}}$$
-In our case $\norm{\vec{n}} = 1$, thus we only need to additionally divide by $\norm{\vec{l}_i-\vec{p}}$. The $\frac{1}{{\norm{\vec{l}_i-\vec{p}}^2}}$ term is a result of the inverse-square law\cite{InverseSquareLaw}, which states that light intensity decreases with the inverse-square of the distance from the light source. Intuitively, this is once again because light energy gets distributed across a larger surface the further away we are in space - imagine a ball of radius $r$ around the light source. The area of said ball is proportional to $r^2$, so with increasing distance, the light energy gets distributed "more thinly" over the surface proportional to $\frac{1}{r^2}$ (see Fig.\ref{fig:Inverse-square law illustration}). For a more formal derivation see subsection \ref{appendix:Irradiance due to a point light} in the appendix.
-
-\begin{figure}[h]
-\centering
-\caption{Figure illustrating the inverse-square law required}
-\label{fig:Inverse-square law illustration}
-\end{figure}
-The componentwise multiplication by $\vec{c}$ accounts for the surface absorption, and the componentiwse multiplication by $\vec{I}_i$ accounts for the light intensity. The final contribution after iterating over all light sources is the sum of all contributions $\sum_{i=1}^{k}{\vec{a}_i}$, where $k$ is the number of lights in the scene. The reference implementation of this integrator can be found in \textit{integrator.h}. 
-
-After rendering the image experienced readers may notice that the supposedly inverse-square falloff doesn't look right (see Fig.\ref{fig:Diffuse local spheres}). This is because we are computing our colors in linear space and saving them as such, but most image viewers expect gamma corrected 8-bit encoded images. Even if they didn't, we would still be making poor use of our 8 bits per channel by linearly encoding our colors, since human perception is not linear\cite{WeberFechnerLaw}. Gamma correcting our image before saving only requires raising our floating point result to the power of $\frac{1}{2.2}$, preferably after having gotten rid of negative values by using a $\max(0,col)$ to avoid domain/range errors. The updated reference implementation can be found in \textit{image.h}
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=\textwidth]{spheres_diffuse_local_640_480.png}
-\caption{Non-gamma corrected local diffuse rendering of a collection of spheres}
-\label{fig:Diffuse local spheres}
-\end{figure}
-
-\begin{figure}[h]
-\includegraphics[width=\textwidth]{spheres_diffuse_local_640_480_gamma.png}
-\caption{Gamma corrected local diffuse rendering of a collection of spheres}
-\end{figure}
-
-A different integrator which is a bit harder to achieve in rasterization based 3D graphics is \textit{IntergratorTransparency}, which renders our surfaces as transparent objects (note that with a more complex material system than just using \textit{col} we could have an $\alpha$ value for each object). Whenever a ray intersects an object with this integrator, the ray is regenerated in order to continue and intersect the other objects behind it blending the colors of all until it does not intersect anything, in which case we multiply with a white background. We will allow up to 10 intersections, which should be more than enough for our 3 (each can have at most 2 intersections, for a total of 6). The code for the \textit{radiance} method can be found below:
-\textit{IntegratorColor}:
-\begin{lstlisting}[language=C++]
-vec3 radiance(const Ray& ray, const Scene& scene) const final
-{
-	Ray r = ray;
-	vec3 col = vec3(1); // white background
-	// allow no more than 10 intersections
-	for (int i = 0; i < 10; ++i)
-	{
-		Intersection intersection = scene.intersect(r);
-		if (!intersection) break;
-		// use the color as a multiplicative filter (it absorbs the color spectrum which it is missing)
-		col *= intersection.s->col; 
-		r.o = r(intersection.t); // regenerate ray starting from the last intersection
-	}
-	return col;
-}
-\end{lstlisting}
-
-The rendered image doesn't look quite right however (see Fig.\ref{fig:Transparency sphere error}). We have a strange pixel pattern which results from some pixels getting more iterations than what is expected. More experienced readers might have already identified the problem as caused by numerical error. This is due to the fact that a computer has finite precision (and how floating point numbers work), so whenever we intersect our sphere, we do not get an intersection point exactly on its infinitely thin surface, it's just "close enough". This means that when we regenerate a ray, it may be from a point that is actually on the same side from which we intersected the surface, possibly resulting in another intersection. One solution to this problem is to simply add an offset from the origin of the ray, and consider intersections only after that point. This can easily be achieved by setting the \textit{minT} parameter to some small value which we'll call \textit{EPSILON} (or in mathematical notation $\epsilon$), this is done by modifying \textit{scene.intersect(ray)} to \textit{scene.intersect(r, EPSILON)}, we use a value of $0.0001$ for $\epsilon$ here. This, however, is not enough (at least on my machine and compiler) to fix the error entirely and get rid of all artifacts including those at the far horizon, I need an offset of $30\epsilon$ to achieve that. This may be undesirable in some cases. A better strategy is offsetting the regenerated ray's origin along the normal of the intersected surface (see Fig.\ref{fig:Avoiding self-intersection}). This has the benefit that it requires a smaller offset, since the normal points in the direction which is closest to the "outside" of the surface (this is due to the gradient being the direction of quickest increase for the function). To achieve this, we use for the ray origin $\vec{p} + \epsilon\vec{n}$, where $\vec{p}$ is the intersection point, and $\vec{n}$ is the normal at $\vec{p}$. Note that this requires that we compute the normal however. 
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.92\textwidth]{spheres_transparency_error_640_480.png}
-\caption{Transparent render of a collection of spheres showcasing floating-point error artifacts}
-\label{fig:Transparency sphere error}
-\end{figure}
-
-\begin{figure}[h]
-\centering
-\caption{Avoiding self-intersection figure required}
-\label{fig:Avoiding self-intersection}
-\end{figure}
-
-There's a minor detail here that's easy to miss, and it's that our surface normal point only towards the "outside" of the object. This means that even if we set a minus in front of the normal offset term, the ray will get stuck inside the sphere at the "exit" intersection, if it's a plus, the ray will get stuck outside of the sphere at the intersection from which it's supposed to enter the sphere. To fix this, we need to distinguish between when a ray enters a surface and when it exits it, and use the appropriate normal (this whole thing will prove very useful in the ray tracing section for refractions). Fortunately there's a very easy way to check this, if the cosine of the angle between the ray direction and the surface normal is negative, then it enters it from the "outside" otherwise it exits from the "inside", see Fig.\ref{fig: Ray-normal angle as indicator of entering/exiting the surface} (outside and inside is really defined by where our normal is facing, in our implementation a sphere with positive radius has normals pointing outwards and thus outside is out of the sphere, on the other hand, if we use a negative radius, the normals will be pointing inside, and that would be considered the "outside" of the sphere). Thus we flip our normal if the cosine between the normal and the ray is positive, and use that normal for offset a negative offset (to push the intersection inside the sphere if it intersected it from the outside or vice versa). This is actually something we didn't account for in \textit{IntegratorDiffuseLocal}, which would have resulted in spheres not being lit properly "on the inside" (which can happen even if there was occlusion if a light source is inside a sphere, while it's not as critical for sphere, it would have been quite obvious for surfaces that are not closed, such as triangles), we apply the adequate modification to the integrator (see the code for reference). One may notice that we're treating our surfaces as two sided unlike what's commonly used in rasterized graphics, this is not an unimportant extension, since it will play a large role for refraction (and as we saw transparency). 
-
-\begin{figure}[h]
-\centering
-\caption{Ray-normal angle as indicator of entering/exiting the surface figure required}
-\label{fig: Ray-normal angle as indicator of entering/exiting the surface} 
-\end{figure}
-
-Back to the transparency integrator, with an offset which just $\epsilon$ we still get some minor artifacts on the ground sphere (see Fig.\ref{fig:Spheres transparency epsilon 1}), on the other hand with an offset with $3\epsilon$ we get a similar result to the $maxT = 30\epsilon$ offset, that's a 10 times difference! Note that the problem can't be ideally eliminated, since an offset of just $\epsilon$ results in some minor ground sphere artifacts (because of the large scale of the ground sphere), and an offset of $3\epsilon$ results in a small "hole" on the bottom of the orange sphere (because of the small scale of the orange sphere). This illustrates the fact that the offset should be proportional to the scale of objects and not constant if one wants to compensate adequately for floating point errors. We won't pursue this issue further and the reader should feel free to leave the offset as $3\epsilon$ or $1\epsilon$ depending on his preference, however, we refer the reader to chapter 7 of "Ray Tracing Gems"\cite{Haines2019} for a technique for computing the sphere intersection more robustly.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.92\textwidth]{spheres_transparency_1eps_640_480.png}
-\caption{Transparent render of a collection of spheres with an offset of $1\epsilon$}
-\label{fig:Spheres transparency epsilon 1}
-\end{figure}
-
-Note that a transparency integrator that eliminates this problem entirely and is a lot more efficient ($O(n)$ vs $O(n^2)$) can be created. This can be achieved by doing the blending with just one ray as we perform the closest intersection search. This however requires creating new surface intersection methods that compute all of the intersections of a surface and blend them, and an equivalent method for the \textit{Scene} class. We won't implement such an integrator, but the reader should feel free to do so if he finds it interesting (it's by no means a requirement to understand later topics).
-
-We'll wrap up this subsection by implementing an integrator similar to what Appel had - with diffuse shading and shadows. To this end, we'll add a method \textit{intersectAny} to the scene class, which as an optimization terminates if the ray intersects any surface (regardless if it's the closest) in the range $(minT,maxT)$. The purpose of this intersection method would be to check for occlusion between the point light source and the point being shaded (i.e. to check if it's in shadow with respect to the given light source). The integrator is a straightforward extension of \textit{IntegratorDiffuseLocal}, the main difference being that contributions from occluded light sources are ignored, and an offset is applied to the shadow ray's origin in order to avoid self-intersection artifacts (the shadow ray is the ray shot towards the light source, Fig.\ref{fig:Spheres diffuse shadow acne} showcases "shadow acne" artifacts on the ground visible if you forget to offset the shadow ray origin). A minor detail that's often overlooked is that the range for the intersection with the shadow ray needs to be in the range $(0,dist-\epsilon)$, where $dist$ is the distance from the (normal offset) intersection with the surface and the position of the point light. This is necessary in order consider only objects between the intersection point and the light source as occluders (and not ones after the light source on he ray). A reference implementation can be found in the C++ code.
-
-\begin{figure}[h]
-\centering
-\includegraphics[width=0.92\textwidth]{spheres_diffuse_shadow_acne_640_480.png}
-\caption{Diffuse render of a collection of spheres showcasing self-intersection artifacts}
-\label{fig:Spheres diffuse shadow acne}
-\end{figure}
+![Diffuse render of a collection of spheres showcasing self-intersection artifacts](images/spheres_diffuse_shadow_acne_640_480.png)
 
 
 The user should feel free to modify the scene by adding more lights, more surfaces, changing the colors, adding an ambient term in the integrators, etc.
+
+
+### More non-physical light sources
+
+We introduce four non-physical types of light sources. Note that these are by no means all the possibly types of non-physical light sources that exist.
+We leave the implementation (and possibly the derivation) of other non-physical light sources to the interested reader.
+
+The first and possibly most basic light source that we consider is the ambient light. 
+It is a light that emits constant light (radiance) from every point in the scene in every direction.
+The ambient light aims to compensate for the lack of indirect illumination in non global 
+rendering methods (similar to rasterization or the two diffuse integrators we have here).
+For example it can make very dark regions of the image brighter. However, it makes *all*
+shaded points brighter, so it is simply like increasing the brightness. Note that it makes no sense 
+to use more than one ambient light, since due to the additivity of light we can represent a collection 
+of $N$ ambient lights with intensities $I_i$ as an ambient light with radiance $\sum_{i=1}^{N}{I_i}$.
+
+Another commonly used non-physical light is the directional light. It is an infinitely distant light source emitting in a single direction. 
+It aims to model far away light sources, so that the rays arriving at the scene are close to parallel. Examples of such emitters are the sun or the moon 
+(as a reflector). 
+This light source is also not physical since it usually spans an infinite area (this can be 
+changed) and each point emits light only in a single direction. A less intuitive and more 
+accurate analogy would be an array of (infinitely many infinitely small) lasers oriented in the exact same direction.
+Note that the directional light we implement is homogeneous with regards to position - it emits the exact same amount 
+of light from all of its points. In comparison a textured directional light would be non-homogeneous.
+
+![The scene rendered with a directional light](images/spheres_diffuse_directional_light_640_480.png)
+
+A straightforward extension to the isotropic (emitting equal light intensity in all directions) point light from the last subsection 
+is the cone light that we implement. It emits light only in a predefined cone, and we additionally use a procedural texture as a function 
+for the light intensity. Very similar to the spot light from rasterization.
+
+![The scene rendered with a textured cone light](images/spheres_diffuse_cone_light_640_480.png)
+
+Finally, analogously to the cone light we implement a cylinder light that is a generalization of the directional light.
+We relax the homogenity requirement for the directional light (emitting the same amount of light from each point), and limit 
+the light emission to a disk region. We additionally use a procedural texture as a function for the radiosity. It can be used to model 
+projectors.
+
+![The scene rendered with a textured cylinder light](images/spheres_diffuse_cylinder_light_640_480.png)
+
+# Appendix
+
+
+## Implicit surface normal derivation
+
+Let us have a differentiable surface in 3D, defined implicitly through the equation:
+$$f(x,y,z) = B = \text{const}$$
+We will show that $\frac{\nabla f(\vec{p})}{\norm{\nabla f(\vec{p})}}$ is the unit normal at the point $\vec{p}$ 
+(as long as the gradient is non-zero at $\vec{p}$).
+By definition the tangent plane to a surface $S$ at point $\vec{p}$ is formed by the tangent vectors to all curves 
+on the surface passing through the point $\vec{p}$.
+
+
+Let $\vec{c}(t) = (c_x(t), c_y(t), c_z(t))$ be a curve on the surface $S$ passing through $\vec{p} = \vec{c}(t_0)$, then $f(\vec{c}(t)) = B$. 
+Taking the derivative with respect to $t$ (and applying the chain rule) yields:
+$$\frac{\partial f}{\partial x}(\vec{c}(t))\frac{dc_x}{dt}(t) + \frac{\partial f}{\partial y}(\vec{c}(t))\frac{dc_y}{dt}(t) + 
+\frac{\partial f}{\partial z}(\vec{c}(t))\frac{dc_z}{dt}(t) = \inner{\nabla f(\vec{c}(t))}{\frac{d\vec{c}}{dt}(t)} = 0$$
+Plugging in $\vec{p} = \vec{c}(t_0)$ yields: $\inner{\nabla f(\vec{p})}{\frac{d\vec{c}}{dt}(t_0)} = 0$.
+This means that the gradient of $f$ is orthogonal to the tangent vector at point $\vec{p}$ of every curve lying on $S$, thus orthogonal to the 
+tangent plane to $S$ at point $\vec{p}$ .
+
+### Sphere normal
+
+Using the result above, we can compute the normal for a sphere with center $\vec{c}$ at point $\vec{p}$. This is done by computing the normalized 
+gradient of the function on the left-hand side of the canonical equation for the sphere:
+$$\norm{\vec{p}-\vec{c}}^2=R^2$$
+This yields: $2(\vec{p}-\vec{c})$. Then it is clear that $\frac{\vec{p}-\vec{c}}{R}$ is the unit normal as long as $\vec{p}$ lies on the sphere.
+
+## Ambient light source
+
+This light source does not model any physical light, its only purpose is to be a very crude 
+substitute for indirect illumination. A better approximation that can be used to replace the 
+ambient light term is ambient occlusion.
+
+To derive the contribution from an ambient light we note that its radiance is constant for 
+all points and directions: $L_e(x,\omega_o) = L = const$
+
+Then by plugging it in the rendering equation yields:
+
+$$L_o(x,\omega_o) = \int_{H^+}{f(\omega_o, x, \omega_i) L \cos\theta_i \,d\omega_i} = 
+ L \int_{H^+}{f(\omega_o, x, \omega_i) \cos\theta_i \,d\omega_i}$$
+
+If the above integral can be computed, then we can give a closed form solution for the 
+contribution of such a light. For a Lambertian (diffuse) BRDF or a Phong BRDF there exists 
+such a solution. For a diffuse BRDF we have $f(\omega_o,x,\omega_i) = \frac{C}{\pi}$, then:
+
+$$L_o(x,\omega_o) = L  \frac{C}{\pi}  \pi = L  C$$
+
+## Radiance and irradiance due to a point light
+We will derive the irradiance due to a point light source onto some differential surface element at point $\vec{p}$. 
+The main issue with point lights is that radiance is not physically defined for them since they have no area, so we compute the irradiance.
+Let $\Phi$ be the flux of a point light source, then its intensity is given as $I = \frac{d\Phi}{d\omega}$. Let $r$ be the distance between $\vec{p}$ and the light source, 
+and let $\cos\theta$ be the cosine of the angle between the normal at $\vec{p}$ and the vector from $\vec{p}$ to the light source. We will use the definition 
+of irradiance:
+$$E(\vec{p}) = \frac{d\Phi}{dA}$$
+and the relation between differential area element and solid angle [#Lessig2012] :
+$$d\omega = \frac{\cos\theta}{r^2}dA$$
+Then:
+$$E(\vec{p}) = \frac{d\Phi}{dA} = \frac{d\Phi}{d\omega}\frac{d\omega}{dA} = 
+I\frac{d\omega}{dA} = 
+I\frac{\cos\theta\,dA}{r^2\,dA} = 
+I\frac{\cos\theta}{r^2}$$
+
+The symbols $dA$ and $d\omega$ are to be understood as differential Lebesgue area measure and differential solid 
+angle measure.
+
+Now we can compute the outgoing radiance from $\vec{p}$ in a direction $\omega_o$ for a diffuse surface ($f=\frac{C}{\pi}$) illuminated by a point light, 
+by using the rendering equation:
+$$L_o(\vec{p},\omega_o) = L_e(\vec{p},\omega_o) + \int_{\Omega}{f(\omega_o,\vec{p},\omega_i) L_i(\vec{p},\omega_i)\cos\theta_i\,d\omega_i} =$$ 
+$$L_e(\vec{p},\omega_o) + \frac{C}{\pi}\int_{\Omega}{L_i(\vec{p},\omega_i)\cos\theta_i\,d\omega_i} = 
+L_e(\vec{p},\omega_o) + \frac{C}{\pi} E(\vec{p}) = L_e(\vec{p},\omega_o) + \frac{CI}{\pi}\frac{\cos\theta}{r^2}$$
+
+
+
+
+
+For the more general case of an arbitrary BRDF and a non-isotropic point light we present 
+the following derivation:
+
+The relationship $E(x) = I(y\rightarrow x) \frac{\cos\theta}{r^2}$ is exactly the same with the only difference 
+being that the intensity is now a function of direction, where $y$ is the position of 
+the light source.
+
+To get the general formula for the radiance we use the Dirac delta:
+
+$$E(x) = I(y\rightarrow x) \frac{\cos\theta}{r^2} =  
+\int_{H^+}{I(y\rightarrow x) \frac{\cos\theta}{r^2}  \delta(\theta_i-\theta)  \delta(\phi_i-\phi) \, d\theta d\phi} =$$
+$$
+= \int_{H^+}{I(y\rightarrow x) \frac{\cos\theta}{r^2} \sin\theta  \delta(\cos\theta_i-\cos\theta) \delta(\phi_i-\phi) \, d\theta d\phi} =
+\int_{H^+}{L_e(x,\theta,\phi) \cos\theta  \sin\theta \, d\theta d\phi}
+$$
+
+In the second step we have used the properties of the Dirac delta (the same can be shown by
+using the co-area formula too). In the third step we have simply grouped 
+all extra terms into $L_e$ as to get the form of the usual definition of the irradiance $E(x)$ in terms of the integral 
+of the radiance multiplied by the cosine. Thus formally we could set the radiance to be:
+$$L_e(x,\theta,\phi) = \frac{I(y\rightarrow x)}{r^2} \delta(\cos\theta_i-\cos\theta) \delta(\phi_i-\phi)$$
+
+Then plugging in the radiance in the rendering equation we get the familiar form (from rasterized graphics, 
+especially if we set $V(x,y) = 1$):
+$$L_o(x,\omega_o) = L_e(x,\omega_o) + f(\omega_o,x,x\rightarrow y) I(y\rightarrow x) \frac{\cos\theta}{r^2} V(x,y)$$
+ 
+$V(x,y)$ is the visibility term and is equal to $1$ if there is nothing between $x$ and $y$. This term 
+appears due to the fact that we are using explicitly $y$, and in the solid angle formulation the 
+$V(x,y)$ term is implicit since we use directions $\omega_i$ rather than arbitrary points $y$ (so we always get the first intersection).
+The above expression is equivalent to sampling the light directly in the area formulation of the rendering equation.
+
+## Directional light radiance
+
+Similar to the derivation for the point light we will use the Dirac delta to derive what would formally constitute the radiance for a directional light source.
+Given radiosity $B(y)$ we want to find the radiance arriving at some point $x$. We additionally know that a directional light source emits light only in a single 
+direction $\omega = (\theta, \phi)$. Since the light source emits only in a single direction we have:
+$$L_o(x,\omega_o) = \int_{H^+}{f(\omega_o,x,\omega_i) L_i(x,\omega_i) \delta(\cos\theta_i-\cos\theta) \delta(\phi_i - \phi) \cos\theta_i \sin\theta_i \, d\theta_i d\phi_i} =$$
+$$= f(\omega_o,x,\omega)L_i(x,\omega) = f(\omega_o,x,\omega)B(r(x,\omega))$$
+
+**Bibliography**:
+
+[#Appel68]: 
+Arthur Appel. 1968. 
+Some techniques for shading machine renderings of solids. 
+In *Proceedings of the April 30--May 2, 1968, spring joint computer conference (AFIPS '68 (Spring)). ACM, New York, NY, USA, 37-45.* 
+http://dx.doi.org/10.1145/1468075.1468082 
+
+Free access at: [Some techniques for shading machine renderings of solids](https://ohiostate.pressbooks.pub/app/uploads/sites/45/2017/09/shading-appel.pdf)
+
+[#Lessig2012]: 
+Christian Lessig, Eugene Fiume, and Mathieu Desbrun.
+On the Mathematical Formulation of Radiance.
+*arXiv  e-prints, page arXiv:1205.4447, May2012*
+
+Free access at: [On the Mathematical Formulation of Radiance](https://arxiv.org/abs/1205.4447)
 
 <!-- Markdeep: -->
 <style class="fallback">body{visibility:hidden;white-space:pre;font-family:monospace}</style>
